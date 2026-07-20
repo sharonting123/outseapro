@@ -18,6 +18,13 @@ python scripts/migrate_sqlite_to_postgres.py --source data/soutui.db --replace
 
 The import is transactional. `--replace` is intentionally explicit because it deletes target application data before importing.
 
+If the Supabase CLI is linked but the database password is not available, export a transactional SQL bundle and run it through the authenticated Management API:
+
+```bash
+python scripts/migrate_sqlite_to_postgres.py --source data/soutui.db --output-sql /tmp/soutui-import.sql --replace
+supabase db query --linked --file /tmp/soutui-import.sql
+```
+
 ## 2. Deploy
 
 Run from Google Cloud Shell or a machine with `gcloud` authenticated:
