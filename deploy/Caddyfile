@@ -6,10 +6,10 @@ facefun.store, www.facefun.store {
 	}
 
 	@shop_exact path /shop
-	redir @shop_exact /shop/
+	redir @shop_exact https://soutui-api-986118955496.us-east1.run.app/ 308
 
 	handle_path /shop/* {
-		reverse_proxy 127.0.0.1:8088
+		redir https://soutui-api-986118955496.us-east1.run.app{uri} 308
 	}
 
 	@apk_download path /download /download/
@@ -36,8 +36,8 @@ facefun.store, www.facefun.store {
 http://42.193.115.42 {
 	encode zstd gzip
 	@shop_exact path / /shop
-	redir @shop_exact /shop/
+	redir @shop_exact https://soutui-api-986118955496.us-east1.run.app/ 308
 	handle_path /shop/* {
-		reverse_proxy 127.0.0.1:8088
+		redir https://soutui-api-986118955496.us-east1.run.app{uri} 308
 	}
 }
