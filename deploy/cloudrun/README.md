@@ -18,6 +18,13 @@ python scripts/migrate_sqlite_to_postgres.py --source data/soutui.db --replace
 
 The import is transactional. `--replace` is intentionally explicit because it deletes target application data before importing.
 
+If the Supabase CLI is linked but the database password is not available, export a transactional SQL bundle and run it through the authenticated Management API:
+
+```bash
+python scripts/migrate_sqlite_to_postgres.py --source data/soutui.db --output-sql /tmp/soutui-import.sql --replace
+supabase db query --linked --file /tmp/soutui-import.sql
+```
+
 ## 2. Deploy
 
 Run from Google Cloud Shell or a machine with `gcloud` authenticated:
@@ -35,7 +42,7 @@ export SOUTUI_BOOTSTRAP_MERCHANT_PASSWORD='use-a-strong-password'
 bash deploy/cloudrun/deploy.sh
 ```
 
-The script enables required APIs, builds the container, stores credentials in Secret Manager, deploys the API and creates the training Job.
+The script enables required APIs, builds the container, stores credentials in Secret Manager, deploys the API and creates the training Job. API instances poll the latest ready model run every 60 seconds, so a completed training Job is loaded without a redeploy.
 Stripe and merchant bootstrap secrets are optional pairs. Without Stripe, the site deploys normally but checkout fails closed until the two Stripe secrets are configured and the script is rerun.
 
 After deployment, update the Stripe webhook endpoint to the printed Cloud Run URL and subscribe to:

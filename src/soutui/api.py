@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from pathlib import Path
 from queue import Empty
 from typing import Any
@@ -22,7 +23,7 @@ from .store import get_store
 from .trace import HUB
 from .auth import authenticate, bootstrap_merchant, current_user, end_session, hash_password, register, require_user, start_session
 from .payments import PaymentError, StripePaymentProvider
-from .training import DEFAULT_ARTIFACT, train
+from .training import DEFAULT_ARTIFACT, load_model_if_available, train
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
@@ -32,6 +33,7 @@ app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="stati
 
 _engine: CommerceEngine | None = None
 _shop: ShopService | None = None
+_model_checked_at = 0.0
 
 CATE_STYLE = {
     "跑鞋": ("linear-gradient(145deg,#1e3a8a,#3b82f6)", "👟"),
@@ -53,10 +55,22 @@ def _url(path: str) -> str:
 
 
 def get_engine() -> CommerceEngine:
-    global _engine
+    global _engine, _model_checked_at
     if _engine is None:
         _engine = build_default_engine()
         ShopService().sync_engine_stock(_engine)
+        _model_checked_at = time.monotonic()
+    store = get_store()
+    refresh_seconds = max(5.0, float(os.getenv("SOUTUI_MODEL_REFRESH_SECONDS", "60")))
+    now = time.monotonic()
+    if store.is_postgres and now - _model_checked_at >= refresh_seconds:
+        _model_checked_at = now
+        latest = store.latest_model_run()
+        current_run_id = getattr(_engine.ads_engine.ranker.model, "run_id", "")
+        if latest and latest["status"] == "ready" and latest["run_id"] != current_run_id:
+            model = load_model_if_available(store=store)
+            if model is not None:
+                _engine.ads_engine.ranker.model = model
     return _engine
 
 
@@ -599,10 +613,11 @@ def merchant_create_product(
 
 
 def _train_and_reload() -> None:
-    global _engine
+    global _engine, _model_checked_at
     store = get_store()
     train(store, None if store.is_postgres else DEFAULT_ARTIFACT)
     _engine = None
+    _model_checked_at = 0.0
 
 
 @app.post("/merchant/train")

@@ -11,3 +11,4 @@ data/ctr_cvr_model*.json
 
 *.log
 .DS_Store
+/supabase/
