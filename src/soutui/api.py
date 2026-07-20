@@ -184,7 +184,12 @@ class TrackBody(BaseModel):
 @app.get("/health")
 def health() -> dict[str, Any]:
     model = get_engine().ads_engine.ranker.model
-    return {"status": "ok", "payment": "configured" if PAYMENTS.configured else "missing_keys", "rank_model": type(model).__name__}
+    return {
+        "status": "ok",
+        "database": "postgresql" if get_store().is_postgres else "sqlite",
+        "payment": "configured" if PAYMENTS.configured else "missing_keys",
+        "rank_model": type(model).__name__,
+    }
 
 
 @app.on_event("startup")
@@ -595,7 +600,8 @@ def merchant_create_product(
 
 def _train_and_reload() -> None:
     global _engine
-    train(get_store(), DEFAULT_ARTIFACT)
+    store = get_store()
+    train(store, None if store.is_postgres else DEFAULT_ARTIFACT)
     _engine = None
 
 

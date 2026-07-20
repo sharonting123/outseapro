@@ -46,7 +46,23 @@ Stripe Webhook 地址为 `https://你的域名/webhooks/stripe`，订阅
 | `/api/search` `/api/feed` | JSON 接口（兼容） |
 | `/trace/stream` | 算法步骤 SSE |
 
-数据文件默认：`data/soutui.db`（目录种子、库存、购物车、订单、events）。
+本地开发默认使用 `data/soutui.db`；设置 `DATABASE_URL` 后自动切换到 Supabase/PostgreSQL。目录、库存、购物车、订单、会话、events 和训练模型都会进入 PostgreSQL。
+
+## Cloud Run + Supabase
+
+生产部署文件位于 [`deploy/cloudrun`](deploy/cloudrun/README.md)：
+
+```bash
+export DATABASE_URL='postgresql://...'
+python scripts/migrate_sqlite_to_postgres.py --source data/soutui.db --replace
+
+export PROJECT_ID='your-gcp-project'
+export STRIPE_SECRET_KEY='sk_...'
+export STRIPE_WEBHOOK_SECRET='whsec_...'
+bash deploy/cloudrun/deploy.sh
+```
+
+同一 Docker 镜像会部署为 FastAPI Service 和 CTR/CVR Cloud Run Job。本地 SQLite 数据不会进入镜像。
 
 ## CTR/CVR 衔接
 

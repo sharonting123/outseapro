@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import sqlite3
 import threading
 import time
@@ -22,7 +23,9 @@ CREATE TABLE IF NOT EXISTS spus (
   cate_l2 TEXT NOT NULL,
   rating REAL NOT NULL,
   keywords_json TEXT NOT NULL,
-  tags_json TEXT NOT NULL
+  tags_json TEXT NOT NULL,
+  merchant_id TEXT NOT NULL DEFAULT 'merchant_demo',
+  status TEXT NOT NULL DEFAULT 'active'
 );
 
 CREATE TABLE IF NOT EXISTS skus (
@@ -38,6 +41,7 @@ CREATE TABLE IF NOT EXISTS cart_items (
   user_id TEXT NOT NULL,
   sku_id TEXT NOT NULL,
   qty INTEGER NOT NULL,
+  request_id TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (user_id, sku_id)
 );
 
@@ -46,7 +50,11 @@ CREATE TABLE IF NOT EXISTS orders (
   user_id TEXT NOT NULL,
   total REAL NOT NULL,
   status TEXT NOT NULL,
-  created_at REAL NOT NULL
+  created_at REAL NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'cny',
+  payment_provider TEXT NOT NULL DEFAULT '',
+  payment_session_id TEXT NOT NULL DEFAULT '',
+  paid_at REAL
 );
 
 CREATE TABLE IF NOT EXISTS order_items (
@@ -57,7 +65,8 @@ CREATE TABLE IF NOT EXISTS order_items (
   title TEXT NOT NULL,
   attrs_json TEXT NOT NULL,
   price REAL NOT NULL,
-  qty INTEGER NOT NULL
+  qty INTEGER NOT NULL,
+  request_id TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -110,30 +119,114 @@ CREATE TABLE IF NOT EXISTS model_runs (
   created_at REAL NOT NULL,
   finished_at REAL
 );
+
+CREATE TABLE IF NOT EXISTS model_artifacts (
+  run_id TEXT PRIMARY KEY REFERENCES model_runs(run_id) ON DELETE CASCADE,
+  artifact_json TEXT NOT NULL,
+  created_at REAL NOT NULL
+);
 """
+
+_POSTGRES_SCHEMA = _SCHEMA.replace(
+    "id INTEGER PRIMARY KEY AUTOINCREMENT", "id BIGSERIAL PRIMARY KEY"
+)
+
+
+def _is_postgres_url(value: str) -> bool:
+    return value.startswith(("postgres://", "postgresql://"))
+
+
+def _adapt_postgres_sql(sql: str) -> str:
+    sql = sql.replace("BEGIN IMMEDIATE", "BEGIN")
+    sql = sql.replace("MAX(0,sales-?)", "GREATEST(0,sales-?)")
+    return sql.replace("?", "%s")
+
+
+class _PgConnection:
+    """Small DB-API compatibility layer so the repository works on SQLite and psycopg."""
+
+    def __init__(self, pool: Any) -> None:
+        self._pool = pool
+        self._conn = pool.getconn()
+        self._closed = False
+
+    def execute(self, sql: str, params: tuple[Any, ...] | list[Any] | None = None):
+        return self._conn.execute(_adapt_postgres_sql(sql), params)
+
+    def executescript(self, script: str) -> None:
+        for statement in script.split(";"):
+            if statement.strip():
+                self._conn.execute(statement)
+
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def rollback(self) -> None:
+        self._conn.rollback()
+
+    def close(self) -> None:
+        if not self._closed:
+            self._pool.putconn(self._conn)
+            self._closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if exc_type:
+            self.rollback()
+        else:
+            self.commit()
+        self.close()
 
 
 class Store:
-    """SQLite：目录 / 购物车 / 订单 / 行为事件。"""
+    """SQLite for local development; PostgreSQL/Supabase when DATABASE_URL is set."""
 
     def __init__(self, db_path: Path | str | None = None) -> None:
-        self.db_path = Path(db_path) if db_path else DEFAULT_DB
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        target = str(db_path) if db_path is not None else os.getenv("DATABASE_URL", str(DEFAULT_DB))
+        self.is_postgres = _is_postgres_url(target)
+        self.database_url = target if self.is_postgres else ""
+        self.db_path = DEFAULT_DB if self.is_postgres else Path(target)
+        self._pool = None
+        if self.is_postgres:
+            from psycopg.rows import dict_row
+            from psycopg_pool import ConnectionPool
+
+            self._pool = ConnectionPool(
+                conninfo=self.database_url,
+                min_size=0,
+                max_size=int(os.getenv("DB_POOL_SIZE", "10")),
+                # Supabase's transaction pooler does not support named prepared
+                # statements consistently across borrowed server connections.
+                kwargs={"row_factory": dict_row, "prepare_threshold": None},
+                open=True,
+            )
+        else:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._init_db()
 
-    def connect(self) -> sqlite3.Connection:
+    def connect(self):
+        if self.is_postgres:
+            return _PgConnection(self._pool)
         conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
+    def close(self) -> None:
+        """Release PostgreSQL pool resources (SQLite connections are per operation)."""
+        if self._pool is not None:
+            self._pool.close()
+
     def _init_db(self) -> None:
         with self._lock:
             conn = self.connect()
             try:
-                conn.executescript(_SCHEMA)
-                self._migrate(conn)
+                conn.executescript(_POSTGRES_SCHEMA if self.is_postgres else _SCHEMA)
+                if not self.is_postgres:
+                    self._migrate(conn)
                 n = conn.execute("SELECT COUNT(*) AS c FROM spus").fetchone()["c"]
                 if n == 0:
                     self._seed(conn)
@@ -161,12 +254,12 @@ class Store:
                 if name not in existing:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
-    def _seed(self, conn: sqlite3.Connection) -> None:
+    def _seed(self, conn: Any) -> None:
         spus, skus = sample_catalog()
         for s in spus:
             conn.execute(
                 "INSERT INTO spus(spu_id,title,brand,cate_l1,cate_l2,rating,keywords_json,tags_json) "
-                "VALUES (?,?,?,?,?,?,?,?)",
+                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(spu_id) DO NOTHING",
                 (
                     s.spu_id,
                     s.title,
@@ -180,7 +273,8 @@ class Store:
             )
         for k in skus:
             conn.execute(
-                "INSERT INTO skus(sku_id,spu_id,price,stock,sales,attrs_json) VALUES (?,?,?,?,?,?)",
+                "INSERT INTO skus(sku_id,spu_id,price,stock,sales,attrs_json) VALUES (?,?,?,?,?,?) "
+                "ON CONFLICT(sku_id) DO NOTHING",
                 (
                     k.sku_id,
                     k.spu_id,
@@ -728,6 +822,32 @@ class Store:
                 d=dict(row); d["metrics"]=json.loads(d.pop("metrics_json")); return d
             finally: conn.close()
 
+    def save_model_artifact(self, run_id: str, artifact: dict[str, Any]) -> None:
+        payload = json.dumps(artifact, ensure_ascii=False)
+        with self._lock:
+            conn = self.connect()
+            try:
+                conn.execute(
+                    "INSERT INTO model_artifacts(run_id,artifact_json,created_at) VALUES(?,?,?) "
+                    "ON CONFLICT(run_id) DO UPDATE SET artifact_json=excluded.artifact_json,created_at=excluded.created_at",
+                    (run_id, payload, time.time()),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def latest_model_artifact(self) -> dict[str, Any] | None:
+        with self._lock:
+            conn = self.connect()
+            try:
+                row = conn.execute(
+                    "SELECT a.artifact_json FROM model_artifacts a JOIN model_runs r ON r.run_id=a.run_id "
+                    "WHERE r.status='ready' ORDER BY r.finished_at DESC LIMIT 1"
+                ).fetchone()
+                return json.loads(row["artifact_json"]) if row else None
+            finally:
+                conn.close()
+
     # ----- events -----
 
     def insert_event(
@@ -752,10 +872,15 @@ class Store:
         with self._lock:
             conn = self.connect()
             try:
-                cur = conn.execute(
+                sql = (
                     "INSERT INTO events(event_type,request_id,user_id,scene,query,spu_id,sku_id,"
                     "position,is_ad,ad_id,pctr,pcvr,features_json,extra_json,ts) "
-                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                )
+                if self.is_postgres:
+                    sql += " RETURNING id"
+                cur = conn.execute(
+                    sql,
                     (
                         event_type,
                         request_id,
@@ -774,8 +899,9 @@ class Store:
                         ts,
                     ),
                 )
+                event_id = int(cur.fetchone()["id"]) if self.is_postgres else int(cur.lastrowid)
                 conn.commit()
-                return int(cur.lastrowid)
+                return event_id
             finally:
                 conn.close()
 

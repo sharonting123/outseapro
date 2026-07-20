@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -107,10 +108,10 @@ def build_datasets(store: Store, attribution_days: int = 7) -> tuple[np.ndarray,
     return x, y_ctr, x_cvr, y_cvr, stats
 
 
-def train(store: Store, artifact_path: Path | str = DEFAULT_ARTIFACT) -> dict[str, Any]:
-    path = Path(artifact_path)
+def train(store: Store, artifact_path: Path | str | None = DEFAULT_ARTIFACT) -> dict[str, Any]:
+    path = Path(artifact_path) if artifact_path else None
     run_id = "model_" + uuid.uuid4().hex[:12]
-    store.add_model_run(run_id, "training", str(path))
+    store.add_model_run(run_id, "training", "database" if store.is_postgres else str(path or ""))
     try:
         x_ctr, y_ctr, x_cvr, y_cvr, stats = build_datasets(store)
         if len(x_ctr) < 20 or len(np.unique(y_ctr)) < 2:
@@ -136,10 +137,12 @@ def train(store: Store, artifact_path: Path | str = DEFAULT_ARTIFACT) -> dict[st
             "ctr": {"weights": ctr_w.tolist(), "bias": ctr_b},
             "cvr": {"weights": cvr_w.tolist(), "bias": cvr_b}, "metrics": metrics,
         }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(artifact, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(path)
+        store.save_model_artifact(run_id, artifact)
+        if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(artifact, ensure_ascii=False, indent=2), encoding="utf-8")
+            tmp.replace(path)
         store.finish_model_run(run_id, "ready", metrics, len(x_ctr))
         return artifact
     except Exception as exc:
@@ -159,13 +162,16 @@ class TrainedCtrCvrModel:
     run_id: str = ""
 
     @classmethod
-    def load(cls, path: Path | str = DEFAULT_ARTIFACT) -> "TrainedCtrCvrModel":
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    def from_dict(cls, data: dict[str, Any]) -> "TrainedCtrCvrModel":
         return cls(
             data["feature_names"], np.asarray(data["mean"]), np.asarray(data["scale"]),
             np.asarray(data["ctr"]["weights"]), float(data["ctr"]["bias"]),
             np.asarray(data["cvr"]["weights"]), float(data["cvr"]["bias"]), data.get("run_id", ""),
         )
+
+    @classmethod
+    def load(cls, path: Path | str = DEFAULT_ARTIFACT) -> "TrainedCtrCvrModel":
+        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
     def predict(self, feats: dict[str, float]) -> tuple[float, float]:
         values = np.asarray([float(feats.get(k, 0.0)) for k in self.feature_names])
@@ -175,8 +181,12 @@ class TrainedCtrCvrModel:
         return clip(pctr), clip(pcvr)
 
 
-def load_model_if_available(path: Path | str = DEFAULT_ARTIFACT) -> TrainedCtrCvrModel | None:
+def load_model_if_available(path: Path | str = DEFAULT_ARTIFACT, store: Store | None = None) -> TrainedCtrCvrModel | None:
     try:
+        if store is not None:
+            artifact = store.latest_model_artifact()
+            if artifact:
+                return TrainedCtrCvrModel.from_dict(artifact)
         return TrainedCtrCvrModel.load(path)
     except (OSError, ValueError, KeyError, json.JSONDecodeError):
         return None
@@ -184,8 +194,8 @@ def load_model_if_available(path: Path | str = DEFAULT_ARTIFACT) -> TrainedCtrCv
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train CTR/CVR logistic models from soutui events")
-    parser.add_argument("--db", default=str(DEFAULT_DB))
-    parser.add_argument("--output", default=str(DEFAULT_ARTIFACT))
+    parser.add_argument("--db", default=os.getenv("DATABASE_URL", str(DEFAULT_DB)))
+    parser.add_argument("--output", default=None if os.getenv("DATABASE_URL") else str(DEFAULT_ARTIFACT))
     args = parser.parse_args()
     artifact = train(Store(args.db), args.output)
     print(json.dumps({"run_id": artifact["run_id"], "metrics": artifact["metrics"]}, ensure_ascii=False, indent=2))
