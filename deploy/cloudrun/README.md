@@ -42,7 +42,7 @@ export SOUTUI_BOOTSTRAP_MERCHANT_PASSWORD='use-a-strong-password'
 bash deploy/cloudrun/deploy.sh
 ```
 
-The script enables required APIs, builds the container, stores credentials in Secret Manager, deploys the API and creates the training Job.
+The script enables required APIs, builds the container, stores credentials in Secret Manager, deploys the API and creates the training Job. API instances poll the latest ready model run every 60 seconds, so a completed training Job is loaded without a redeploy.
 Stripe and merchant bootstrap secrets are optional pairs. Without Stripe, the site deploys normally but checkout fails closed until the two Stripe secrets are configured and the script is rerun.
 
 After deployment, update the Stripe webhook endpoint to the printed Cloud Run URL and subscribe to:

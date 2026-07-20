@@ -13,7 +13,7 @@ if [[ -n "${SOUTUI_BOOTSTRAP_MERCHANT_EMAIL:-}" || -n "${SOUTUI_BOOTSTRAP_MERCHA
   : "${SOUTUI_BOOTSTRAP_MERCHANT_PASSWORD:?Set both merchant bootstrap values or neither}"
 fi
 
-REGION="${REGION:-us-central1}"
+REGION="${REGION:-us-east1}"
 SERVICE_NAME="${SERVICE_NAME:-soutui-api}"
 JOB_NAME="${JOB_NAME:-soutui-train}"
 REPOSITORY="${REPOSITORY:-soutui}"
@@ -54,8 +54,10 @@ if [[ -n "${SOUTUI_BOOTSTRAP_MERCHANT_EMAIL:-}" ]]; then
   SECRET_MAPPINGS+=(SOUTUI_BOOTSTRAP_MERCHANT_EMAIL=soutui-merchant-email:latest SOUTUI_BOOTSTRAP_MERCHANT_PASSWORD=soutui-merchant-password:latest)
 fi
 
-PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
-RUNTIME_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+RUNTIME_ACCOUNT="soutui-runtime@${PROJECT_ID}.iam.gserviceaccount.com"
+if ! gcloud iam service-accounts describe "${RUNTIME_ACCOUNT}" >/dev/null 2>&1; then
+  gcloud iam service-accounts create soutui-runtime --display-name='Soutui Cloud Run runtime'
+fi
 for secret in "${SECRETS[@]}"; do
   gcloud secrets add-iam-policy-binding "${secret}" \
     --member="serviceAccount:${RUNTIME_ACCOUNT}" --role='roles/secretmanager.secretAccessor' >/dev/null
@@ -65,12 +67,14 @@ SECRET_ARG="$(IFS=,; echo "${SECRET_MAPPINGS[*]}")"
 
 gcloud run deploy "${SERVICE_NAME}" \
   --image "${IMAGE}" --region "${REGION}" --allow-unauthenticated \
+  --service-account "${RUNTIME_ACCOUNT}" \
   --port 8080 --cpu 1 --memory 1Gi --min-instances 0 --max-instances 5 \
-  --set-env-vars 'SOUTUI_SECURE_COOKIE=1,DB_POOL_SIZE=5' \
+  --set-env-vars 'SOUTUI_SECURE_COOKIE=1,DB_POOL_SIZE=5,SOUTUI_MODEL_REFRESH_SECONDS=60' \
   --set-secrets "${SECRET_ARG}"
 
 gcloud run jobs deploy "${JOB_NAME}" \
   --image "${IMAGE}" --region "${REGION}" \
+  --service-account "${RUNTIME_ACCOUNT}" \
   --command python --args=-m,soutui.training \
   --cpu 1 --memory 1Gi --max-retries 1 --task-timeout 30m \
   --set-env-vars 'DB_POOL_SIZE=2' \
