@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}支付结果 · 甄选{% endblock %}
+{% block content %}
+<div class="panel auth-card">
+  {% if order.status == 'paid' %}
+  <h2 class="success">支付成功</h2>
+  <p>订单 <b>{{ order.order_id }}</b> 已完成支付，金额 ¥{{ '%.2f'|format(order.total) }}。</p>
+  {% else %}
+  <h2>正在确认支付</h2>
+  <p>支付平台通知可能需要几秒钟，当前状态：{{ order.status }}。</p>
+  <script>setTimeout(() => location.reload(), 2500)</script>
+  {% endif %}
+  <a class="btn" href="{{ base_path }}/order/{{ order.order_id }}">查看订单</a>
+</div>
+{% endblock %}

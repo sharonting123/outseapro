@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ spu.title }} · 甄选{% endblock %}
+{% block content %}
+<div class="panel detail-layout">
+  <div class="thumb" style="aspect-ratio:auto;min-height:360px;border-radius:4px;">
+    <div class="thumb-art" style="background:{{ thumb_bg }};width:70%;height:70%;">{{ thumb_emoji }}</div>
+  </div>
+  <div>
+    <h1 style="margin:0 0 8px;font-size:22px;">{{ spu.title }}</h1>
+    <div class="shop-row" style="margin-bottom:12px;">
+      <span>{{ spu.brand }} · {{ spu.cate_l1 }}/{{ spu.cate_l2 }}</span>
+      <span class="rating">{{ '%.1f'|format(spu.rating) }} 分</span>
+    </div>
+    <div class="price"><small>¥</small><span id="priceVal">{{ '%.2f'|format(selected.price) }}</span></div>
+    <div class="meta" style="margin-top:6px;">起售价 ¥{{ '%.2f'|format(price_from) }} · {{ skus|length }} 个规格</div>
+
+    <div style="margin-top:18px;font-size:13px;color:#666;">选择规格</div>
+    <div class="sku-opts" id="skuOpts">
+      {% for s in skus %}
+      <button type="button"
+              class="sku-opt {% if s.sku_id == selected.sku_id %}on{% endif %} {% if s.stock <= 0 %}disabled{% endif %}"
+              data-sku="{{ s.sku_id }}"
+              data-price="{{ s.price }}"
+              data-stock="{{ s.stock }}"
+              data-attrs="{{ s.attr_text }}">
+        {{ s.attr_text or s.sku_id }}{% if s.stock <= 0 %}（缺货）{% endif %}
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="meta" id="stockLine">库存 {{ selected.stock }} · SKU {{ selected.sku_id }}</div>
+    <div style="margin-top:20px;display:flex;gap:10px;align-items:center;">
+      <label>数量 <input class="qty-input" id="qty" type="number" min="1" value="1" /></label>
+      <button class="btn" id="btnAdd" type="button">加入购物车</button>
+      <a class="btn ghost" href="{{ base_path }}/cart">去结算</a>
+    </div>
+    <div class="ids" style="margin-top:16px;"><span>SPU {{ spu.spu_id }}</span><span id="skuLine">SKU {{ selected.sku_id }}</span></div>
+    <p id="msg" class="meta" style="margin-top:12px;"></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let skuId = {{ selected.sku_id|tojson }};
+  const spuId = {{ spu.spu_id|tojson }};
+  const rid = {{ (request_id or '')|tojson }};
+  document.querySelectorAll('.sku-opt').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.sku-opt').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      skuId = btn.dataset.sku;
+      document.getElementById('priceVal').textContent = Number(btn.dataset.price).toFixed(2);
+      document.getElementById('stockLine').textContent = `库存 ${btn.dataset.stock} · SKU ${skuId}`;
+      document.getElementById('skuLine').textContent = `SKU ${skuId}`;
+    };
+  });
+  document.getElementById('btnAdd').onclick = async () => {
+    const qty = Number(document.getElementById('qty').value || 1);
+    const r = await fetch({{ (base_path + '/api/cart')|tojson }}, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'add', sku_id: skuId, qty, request_id: rid})
+    });
+    const data = await r.json();
+    const msg = document.getElementById('msg');
+    if (r.status === 401) { location.href={{ (base_path + '/login?next=')|tojson }} + encodeURIComponent(location.pathname + location.search); return; }
+    if (!r.ok) { msg.textContent = data.detail || data.error || '加购失败'; msg.style.color='#c00'; return; }
+    msg.textContent = `已加入购物车（共 ${data.cart_count} 件）`;
+    msg.style.color = '#155e75';
+  };
+</script>
+{% endblock %}

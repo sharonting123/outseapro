@@ -1,0 +1,43 @@
+facefun.store, www.facefun.store {
+	encode zstd gzip
+
+	request_body {
+		max_size 12MB
+	}
+
+	@shop_exact path /shop
+	redir @shop_exact /shop/
+
+	handle_path /shop/* {
+		reverse_proxy 127.0.0.1:8088
+	}
+
+	@apk_download path /download /download/
+	handle @apk_download {
+		root * /var/www/facefun
+		rewrite * /FaceShift.apk
+		header Content-Type application/vnd.android.package-archive
+		header Content-Disposition "attachment; filename=FaceShift.apk"
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	@landing path / /index.html
+	handle @landing {
+		root * /var/www/facefun
+		file_server
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8000
+	}
+}
+
+http://42.193.115.42 {
+	encode zstd gzip
+	@shop_exact path / /shop
+	redir @shop_exact /shop/
+	handle_path /shop/* {
+		reverse_proxy 127.0.0.1:8088
+	}
+}

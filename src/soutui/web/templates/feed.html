@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{% if scene == 'search' %}搜索 {{ query }} · 甄选{% else %}为你推荐 · 甄选{% endif %}{% endblock %}
+{% block content %}
+<div class="filter-bar">
+  <div class="crumb">
+    {% if scene == 'search' %}
+      全部结果 &gt; <b>{{ query }}</b>
+    {% else %}
+      首页 &gt; <b>为你推荐</b>
+    {% endif %}
+  </div>
+  <div class="meta" id="meta">
+    共 {{ items|length }} 件 · 自然 {{ organic_count }} · 广告 {{ ad_count }}
+    {% if request_id %} · trace {{ request_id }}{% endif %}
+  </div>
+</div>
+
+<div class="main-row">
+  <div class="grid" id="list">
+    {% if not items %}
+      <div class="empty" style="grid-column:1/-1">暂无商品</div>
+    {% endif %}
+    {% for it in items %}
+    <a class="sku-card {% if it.is_ad %}ad{% endif %}"
+                href="{{ base_path }}/item/{{ it.spu_id }}?sku={{ it.sku_id }}&rid={{ request_id }}&pos={{ it.position }}&scene={{ scene }}"
+       data-track
+       data-spu="{{ it.spu_id }}"
+       data-sku="{{ it.sku_id }}"
+       data-rid="{{ request_id }}"
+       data-pos="{{ it.position }}"
+       data-ad="{% if it.is_ad %}1{% else %}0{% endif %}"
+       data-adid="{{ it.ad_id }}"
+       data-scene="{{ scene }}">
+      <div class="thumb">
+        {% if it.is_ad %}<span class="ad-tag">广告</span>{% endif %}
+        <div class="thumb-art" style="background:{{ it.thumb_bg }}">{{ it.thumb_emoji }}</div>
+      </div>
+      <div class="info">
+        <div class="price-row">
+          <div class="price"><small>¥</small>{{ '%.2f'|format(it.price) }}</div>
+          <div class="sales">已售{{ it.sales }}</div>
+        </div>
+        <div class="title">{% if it.is_ad %}<em>广告</em>{% endif %}{{ it.title }}</div>
+        <div class="shop-row">
+          <span>{{ it.brand }}官方旗舰店</span>
+          <span class="rating">{{ '%.1f'|format(it.rating) }}分</span>
+        </div>
+        {% if it.attr_text %}<div class="chip">{{ it.attr_text }}{% if it.sku_count > 1 %} · {{ it.sku_count }}规格{% endif %}</div>{% endif %}
+        {% if it.is_ad %}<div class="charge">扣费 {{ it.charge }}{% if it.charge_unit == 'per_click' %}/点击{% else %}/千次{% endif %}</div>{% endif %}
+        <div class="ids"><span>{{ it.spu_id }}</span><span>{{ it.sku_id }}</span></div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <aside class="algo-panel">
+    <div class="algo-head">
+      <div><span class="live-dot" id="liveDot"></span><strong>算法实时日志</strong></div>
+      <span id="liveStatus">连接中…</span>
+    </div>
+    <div class="algo-body" id="algoLog">
+      {% if trace and trace.events %}
+        {% for e in trace.events %}
+        <div class="algo-step stage-{{ e.stage }}">
+          <div class="title">#{{ e.seq }} {{ e.title }}</div>
+          {% if e.formula %}<div class="formula">∴ {{ e.formula }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="algo-empty">本次请求轨迹会显示在这里</div>
+      {% endif %}
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const watchId = {{ (request_id or '')|tojson }};
+  const algoLog = document.getElementById('algoLog');
+  const liveStatus = document.getElementById('liveStatus');
+  function appendStep(ev) {
+    if (watchId && ev.request_id && ev.request_id !== watchId) return;
+    const el = document.createElement('div');
+    el.className = 'algo-step stage-' + (ev.stage || 'start');
+    el.innerHTML = `<div class="title">#${ev.seq||''} ${ev.title||''}</div>` +
+      (ev.formula ? `<div class="formula">∴ ${ev.formula}</div>` : '');
+    algoLog.appendChild(el);
+    algoLog.scrollTop = algoLog.scrollHeight;
+  }
+  const es = new EventSource({{ (base_path + '/trace/stream')|tojson }});
+  es.onopen = () => { liveStatus.textContent = '已连接'; };
+  es.onerror = () => { liveStatus.textContent = '重连中…'; };
+  es.onmessage = (msg) => {
+    try {
+      const ev = JSON.parse(msg.data);
+      if (ev.type === 'step') appendStep(ev);
+      if (ev.type === 'done' && (!watchId || ev.request_id === watchId)) {
+        liveStatus.textContent = `完成 · ${ev.steps||0} 步`;
+      }
+    } catch (_) {}
+  };
+  document.querySelectorAll('[data-track]').forEach(a => {
+    a.addEventListener('click', () => {
+      const body = {
+        event_type: 'click',
+        request_id: a.dataset.rid || '',
+        scene: a.dataset.scene || '',
+        spu_id: a.dataset.spu || '',
+        sku_id: a.dataset.sku || '',
+        position: Number(a.dataset.pos || -1),
+        is_ad: a.dataset.ad === '1',
+        ad_id: a.dataset.adid || '',
+      };
+      navigator.sendBeacon({{ (base_path + '/api/track')|tojson }}, new Blob([JSON.stringify(body)], {type:'application/json'}));
+    });
+  });
+</script>
+{% endblock %}

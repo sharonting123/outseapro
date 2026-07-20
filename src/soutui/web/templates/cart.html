@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}购物车 · 甄选{% endblock %}
+{% block content %}
+<div class="panel">
+  <h2 style="margin-top:0;">购物车</h2>
+  {% if not cart['items'] %}
+    <div class="empty">购物车是空的，去 <a href="{{ base_path }}/" style="color:var(--brand-dark)">逛逛</a></div>
+  {% else %}
+  <table class="cart-table">
+    <thead>
+      <tr><th>商品</th><th>规格</th><th>单价</th><th>数量</th><th>小计</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for it in cart['items'] %}
+      <tr data-sku="{{ it.sku_id }}">
+        <td><a href="{{ base_path }}/item/{{ it.spu_id }}?sku={{ it.sku_id }}">{{ it.title }}</a></td>
+        <td>{{ it.attr_text }}</td>
+        <td>¥{{ '%.2f'|format(it.price) }}</td>
+        <td>
+          <input class="qty-input qty" type="number" min="0" max="{{ it.stock }}" value="{{ it.qty }}" />
+        </td>
+        <td>¥{{ '%.2f'|format(it.subtotal) }}</td>
+        <td><button class="btn ghost rm" type="button" style="height:32px;">删除</button></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="margin-top:18px;display:flex;justify-content:space-between;align-items:center;">
+    <div>合计 <b style="color:var(--price);font-size:22px;">¥{{ '%.2f'|format(cart.total) }}</b></div>
+    <button class="btn" id="btnCheckout" type="button">安全支付</button>
+  </div>
+  <p id="msg" class="meta"></p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function setQty(sku, qty) {
+    const r = await fetch({{ (base_path + '/api/cart')|tojson }}, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action:'set', sku_id: sku, qty})
+    });
+    if (r.ok) location.reload();
+    else {
+      const d = await r.json();
+      alert(d.detail || '更新失败');
+    }
+  }
+  document.querySelectorAll('tr[data-sku]').forEach(tr => {
+    const sku = tr.dataset.sku;
+    tr.querySelector('.qty').onchange = (e) => setQty(sku, Number(e.target.value));
+    tr.querySelector('.rm').onclick = () => setQty(sku, 0);
+  });
+  const btn = document.getElementById('btnCheckout');
+  if (btn) btn.onclick = async () => {
+    btn.disabled = true;
+    const r = await fetch({{ (base_path + '/api/checkout')|tojson }}, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+    const d = await r.json();
+    if (!r.ok) {
+      document.getElementById('msg').textContent = d.detail || '下单失败';
+      btn.disabled = false;
+      return;
+    }
+    location.href = d.checkout_url;
+  };
+</script>
+{% endblock %}

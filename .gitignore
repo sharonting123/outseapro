@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+.env
+data/*.db
+data/*.db-*
+data/ctr_cvr_model*.json
+
+*.log
+.DS_Store

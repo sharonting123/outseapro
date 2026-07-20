@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}登录 · 甄选{% endblock %}
+{% block content %}
+<div class="auth-card panel">
+  <h2>登录甄选</h2>
+  <form method="post" action="{{ base_path }}/login" class="stack-form">
+    <input type="hidden" name="next" value="{{ next or '/' }}" />
+    <label>邮箱<input type="email" name="email" autocomplete="email" required /></label>
+    <label>密码<input type="password" name="password" autocomplete="current-password" required /></label>
+    <button class="btn" type="submit">登录</button>
+  </form>
+  <p class="meta">还没有账户？<a class="text-link" href="{{ base_path }}/register">立即注册</a></p>
+</div>
+{% endblock %}

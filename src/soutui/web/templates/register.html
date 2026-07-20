@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}注册 · 甄选{% endblock %}
+{% block content %}
+<div class="auth-card panel">
+  <h2>创建账户</h2>
+  <form method="post" action="{{ base_path }}/register" class="stack-form">
+    <label>昵称<input name="display_name" maxlength="40" required /></label>
+    <label>邮箱<input type="email" name="email" autocomplete="email" required /></label>
+    <label>密码<input type="password" name="password" minlength="8" autocomplete="new-password" required /></label>
+    <button class="btn" type="submit">注册并登录</button>
+  </form>
+</div>
+{% endblock %}

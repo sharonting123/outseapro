@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}账户安全 · 甄选{% endblock %}
+{% block content %}
+<div class="auth-card panel">
+  <h2>账户安全</h2>
+  <p class="meta">{{ current_user.email }} · {{ current_user.role }}</p>
+  <form method="post" action="{{ base_path }}/account/password" class="stack-form">
+    <label>当前密码<input type="password" name="current_password" autocomplete="current-password" required /></label>
+    <label>新密码<input type="password" name="new_password" minlength="8" autocomplete="new-password" required /></label>
+    <button class="btn" type="submit">更新密码并退出其他会话</button>
+  </form>
+</div>
+{% endblock %}

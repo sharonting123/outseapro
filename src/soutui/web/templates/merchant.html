@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}商家后台 · 甄选{% endblock %}
+{% block content %}
+<div class="merchant-head">
+  <div><h2>商家后台</h2><p class="meta">管理真实库存、订单和排序模型</p></div>
+  <form action="{{ base_path }}/merchant/train" method="post"><button class="btn" type="submit">训练并发布 CTR/CVR</button></form>
+</div>
+
+<div class="stats-grid">
+  <div class="stat"><b>{{ products|length }}</b><span>SKU</span></div>
+  <div class="stat"><b>{{ orders|length }}</b><span>订单</span></div>
+  <div class="stat"><b>{{ model_run.status if model_run else '未训练' }}</b><span>模型状态</span></div>
+  <div class="stat"><b>{{ model_run.sample_count if model_run else 0 }}</b><span>训练曝光</span></div>
+</div>
+
+{% if model_run %}
+<div class="panel merchant-section">
+  <h3>最新模型 {{ model_run.run_id }}</h3>
+  {% if model_run.metrics.error %}<div class="err">{{ model_run.metrics.error }}</div>{% endif %}
+  <div class="metric-row">
+    {% for key, value in model_run.metrics.items() if key != 'error' %}<span><b>{{ key }}</b> {{ '%.4f'|format(value) if value is number else value }}</span>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="panel merchant-section">
+  <h3>商品与库存</h3>
+  <details class="create-product"><summary>新建商品</summary>
+    <form class="product-form" method="post" action="{{ base_path }}/merchant/products">
+      <input name="spu_id" placeholder="SPU ID，如 spu_my_item" required />
+      <input name="sku_id" placeholder="SKU ID，如 sku_my_item_1" required />
+      <input name="title" placeholder="商品标题" required />
+      <input name="brand" placeholder="品牌" required />
+      <input name="cate_l1" placeholder="一级类目" required />
+      <input name="cate_l2" placeholder="二级类目" required />
+      <input name="price" type="number" min="0.01" step="0.01" placeholder="价格" required />
+      <input name="stock" type="number" min="0" placeholder="库存" required />
+      <button class="btn" type="submit">创建商品</button>
+    </form>
+  </details>
+  <div class="table-scroll"><table class="cart-table">
+    <thead><tr><th>商品</th><th>SKU / 规格</th><th>销量</th><th>价格与库存</th></tr></thead>
+    <tbody>{% for p in products %}<tr>
+      <td>{{ p.title }}<div class="meta">{{ p.brand }} · {{ p.spu_id }}</div></td>
+      <td>{{ p.sku_id }}<div class="meta">{{ p.attrs.values()|list|join(' / ') }}</div></td>
+      <td>{{ p.sales }}</td>
+      <td><form class="inline-edit" method="post" action="{{ base_path }}/merchant/sku/{{ p.sku_id }}">
+        <label>¥ <input name="price" type="number" min="0.01" step="0.01" value="{{ p.price }}" /></label>
+        <label>库存 <input name="stock" type="number" min="0" value="{{ p.stock }}" /></label>
+        <button class="btn ghost" type="submit">保存</button>
+      </form></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+
+<div class="panel merchant-section">
+  <h3>订单</h3>
+  <div class="table-scroll"><table class="cart-table">
+    <thead><tr><th>订单号</th><th>用户</th><th>金额</th><th>状态</th><th>支付渠道</th></tr></thead>
+    <tbody>{% for o in orders %}<tr><td>{{ o.order_id }}</td><td>{{ o.user_id }}</td><td>¥{{ '%.2f'|format(o.total) }}</td><td>{{ o.status }}</td><td>{{ o.payment_provider or '-' }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+{% endblock %}
