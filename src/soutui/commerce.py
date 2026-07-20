@@ -86,4 +86,4 @@ class CommerceEngine:
 def build_default_engine() -> CommerceEngine:
     from .store import get_store
     spus, skus = get_store().load_catalog()
-    return CommerceEngine(spus=spus, skus=skus, model=load_model_if_available())
+    return CommerceEngine(spus=spus, skus=skus, model=load_model_if_available(store=get_store()))
