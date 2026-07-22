@@ -110,6 +110,23 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
+CREATE TABLE IF NOT EXISTS admin_users (
+  admin_id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token_hash TEXT PRIMARY KEY,
+  admin_id TEXT NOT NULL REFERENCES admin_users(admin_id) ON DELETE CASCADE,
+  expires_at REAL NOT NULL,
+  created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
+
 CREATE TABLE IF NOT EXISTS model_runs (
   run_id TEXT PRIMARY KEY,
   status TEXT NOT NULL,
@@ -227,9 +244,9 @@ class Store:
                 conn.executescript(_POSTGRES_SCHEMA if self.is_postgres else _SCHEMA)
                 if not self.is_postgres:
                     self._migrate(conn)
-                n = conn.execute("SELECT COUNT(*) AS c FROM spus").fetchone()["c"]
-                if n == 0:
-                    self._seed(conn)
+                # Idempotently add catalog entries introduced by newer releases.
+                # ON CONFLICT keeps merchant-edited price, stock, and product rows intact.
+                self._seed(conn)
                 conn.commit()
             finally:
                 conn.close()
@@ -359,6 +376,28 @@ class Store:
                 d = dict(row)
                 d["attrs"] = json.loads(d.pop("attrs_json"))
                 return d
+            finally:
+                conn.close()
+
+    def get_skus(self, sku_ids: list[str] | tuple[str, ...]) -> dict[str, dict[str, Any]]:
+        """Load a set of SKUs in one database round trip, keyed by sku_id."""
+        ids = list(dict.fromkeys(sku_ids))
+        if not ids:
+            return {}
+        placeholders = ",".join("?" for _ in ids)
+        with self._lock:
+            conn = self.connect()
+            try:
+                rows = conn.execute(
+                    f"SELECT * FROM skus WHERE sku_id IN ({placeholders})",
+                    tuple(ids),
+                ).fetchall()
+                out: dict[str, dict[str, Any]] = {}
+                for row in rows:
+                    item = dict(row)
+                    item["attrs"] = json.loads(item.pop("attrs_json"))
+                    out[item["sku_id"]] = item
+                return out
             finally:
                 conn.close()
 
@@ -714,6 +753,83 @@ class Store:
             finally:
                 conn.close()
 
+    # ----- isolated administrator identities / sessions -----
+
+    def create_admin(self, admin_id: str, email: str, password_hash: str, display_name: str) -> dict[str, Any]:
+        with self._lock:
+            conn = self.connect()
+            try:
+                conn.execute(
+                    "INSERT INTO admin_users(admin_id,email,password_hash,display_name,created_at) VALUES(?,?,?,?,?)",
+                    (admin_id, email.strip().lower(), password_hash, display_name.strip(), time.time()),
+                )
+                conn.commit()
+                return self._public_admin(conn.execute("SELECT * FROM admin_users WHERE admin_id=?", (admin_id,)).fetchone())
+            finally:
+                conn.close()
+
+    @staticmethod
+    def _public_admin(row: Any) -> dict[str, Any]:
+        data = dict(row)
+        data.pop("password_hash", None)
+        return data
+
+    def get_admin_by_email(self, email: str, include_hash: bool = False) -> dict[str, Any] | None:
+        with self._lock:
+            conn = self.connect()
+            try:
+                row = conn.execute("SELECT * FROM admin_users WHERE email=?", (email.strip().lower(),)).fetchone()
+                if not row:
+                    return None
+                data = dict(row)
+                if not include_hash:
+                    data.pop("password_hash", None)
+                return data
+            finally:
+                conn.close()
+
+    def create_admin_session(self, token: str, admin_id: str, expires_at: float) -> None:
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with self._lock:
+            conn = self.connect()
+            try:
+                conn.execute("DELETE FROM admin_sessions WHERE expires_at<=?", (time.time(),))
+                conn.execute(
+                    "INSERT INTO admin_sessions(token_hash,admin_id,expires_at,created_at) VALUES(?,?,?,?)",
+                    (token_hash, admin_id, expires_at, time.time()),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def session_admin(self, token: str) -> dict[str, Any] | None:
+        if not token:
+            return None
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with self._lock:
+            conn = self.connect()
+            try:
+                row = conn.execute(
+                    "SELECT a.* FROM admin_sessions s JOIN admin_users a ON a.admin_id=s.admin_id "
+                    "WHERE s.token_hash=? AND s.expires_at>? AND a.is_active=1",
+                    (token_hash, time.time()),
+                ).fetchone()
+                return self._public_admin(row) if row else None
+            finally:
+                conn.close()
+
+    def delete_admin_session(self, token: str) -> None:
+        if not token:
+            return
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with self._lock:
+            conn = self.connect()
+            try:
+                conn.execute("DELETE FROM admin_sessions WHERE token_hash=?", (token_hash,))
+                conn.commit()
+            finally:
+                conn.close()
+
     def update_password(self, user_id: str, password_hash: str) -> None:
         with self._lock:
             conn = self.connect()
@@ -902,6 +1018,48 @@ class Store:
                 event_id = int(cur.fetchone()["id"]) if self.is_postgres else int(cur.lastrowid)
                 conn.commit()
                 return event_id
+            finally:
+                conn.close()
+
+    def insert_events(self, events: list[dict[str, Any]]) -> int:
+        """Insert event rows with one statement and one commit."""
+        if not events:
+            return 0
+        columns = (
+            "event_type", "request_id", "user_id", "scene", "query", "spu_id", "sku_id",
+            "position", "is_ad", "ad_id", "pctr", "pcvr", "features_json", "extra_json", "ts",
+        )
+        values_sql = ",".join(
+            "(" + ",".join("?" for _ in columns) + ")" for _ in events
+        )
+        params: list[Any] = []
+        for event in events:
+            params.extend((
+                event.get("event_type", ""),
+                event.get("request_id", ""),
+                event.get("user_id", ""),
+                event.get("scene", ""),
+                event.get("query", ""),
+                event.get("spu_id", ""),
+                event.get("sku_id", ""),
+                int(event.get("position", -1)),
+                1 if event.get("is_ad", False) else 0,
+                event.get("ad_id", ""),
+                event.get("pctr"),
+                event.get("pcvr"),
+                json.dumps(event.get("features") or {}, ensure_ascii=False),
+                json.dumps(event.get("extra") or {}, ensure_ascii=False),
+                float(event["ts"]),
+            ))
+        with self._lock:
+            conn = self.connect()
+            try:
+                conn.execute(
+                    f"INSERT INTO events({','.join(columns)}) VALUES {values_sql}",
+                    tuple(params),
+                )
+                conn.commit()
+                return len(events)
             finally:
                 conn.close()
 

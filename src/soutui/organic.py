@@ -127,7 +127,7 @@ class OrganicEngine:
         emit(
             "organic",
             f"【自然精排】SPU {len(hits)} → Top-{len(ranked)}",
-            formula="score = 1.2·cate + 0.9·emb + 0.7·sales + 0.4·rating；再选 SKU",
+            formula="score = 1.5·cate + 0.6·emb + 0.3·sales + 0.2·rating + 0.9·cold_start；再选 SKU",
             detail={
                 "hits": len(hits),
                 "top": [
@@ -195,6 +195,7 @@ class OrganicEngine:
             sales_score = math.log1p(spu_sales(skus)) / 12.0
             rating_score = (spu.rating - 3.0) / 2.0
             emb = cosine(build_user_embedding(user), spu.embedding)
+            cold_start_score = 1.0 if spu_sales(skus) == 0 and cate_match else 0.0
 
             if search_mode and ctx.query.strip():
                 if text_rel < 0.15 and "search_bm25" not in sources and "text_match" not in sources:
@@ -210,7 +211,13 @@ class OrganicEngine:
                     + (0.4 if "search_bm25" in sources or "text_match" in sources else 0.0)
                 )
             elif ctx.scene == Scene.FEED:
-                score = 1.2 * cate_match + 0.9 * emb + 0.7 * sales_score + 0.4 * rating_score
+                score = (
+                    1.5 * cate_match
+                    + 0.6 * emb
+                    + 0.3 * sales_score
+                    + 0.2 * rating_score
+                    + 0.9 * cold_start_score
+                )
             else:
                 score = (
                     2.5 * text_rel
@@ -232,6 +239,7 @@ class OrganicEngine:
                         "sales_score": sales_score,
                         "rating_score": rating_score,
                         "emb": emb,
+                        "cold_start_score": cold_start_score,
                         "sku_price": sku.price,
                         "sku_stock": float(sku.stock),
                     },

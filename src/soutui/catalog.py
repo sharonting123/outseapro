@@ -35,6 +35,12 @@ def sample_catalog() -> tuple[list[Spu], list[Sku]]:
         ("spu_sony_wh", "Sony WH-1000XM5", "Sony", "数码", "耳机", 4.8, ("耳机", "降噪")),
         ("spu_kindle", "Kindle Paperwhite", "Amazon", "图书", "电子书", 4.7, ("电子书", "kindle")),
         ("spu_coffee_machine", "半自动咖啡机", "DeLonghi", "餐饮", "咖啡", 4.6, ("咖啡机", "咖啡")),
+        ("spu_honey_acacia", "甄选槐花蜜", "甄选蜂场", "食品", "蜂蜜", 0.0, ("蜂蜜", "槐花蜜", "洋槐蜜")),
+        ("spu_honey_jujube", "甄选枣花蜜", "甄选蜂场", "食品", "蜂蜜", 0.0, ("蜂蜜", "枣花蜜")),
+        ("spu_honey_wildflower", "甄选百花蜜", "甄选蜂场", "食品", "蜂蜜", 0.0, ("蜂蜜", "百花蜜", "野花蜜")),
+        ("spu_honey_linden", "甄选椴树蜜", "甄选蜂场", "食品", "蜂蜜", 0.0, ("蜂蜜", "椴树蜜")),
+        ("spu_royal_jelly", "鲜蜂王浆", "甄选蜂场", "食品", "蜂产品", 0.0, ("蜂王浆", "蜂产品", "鲜蜂王浆")),
+        ("spu_honey_gift", "蜂蜜组合礼盒", "甄选蜂场", "食品", "蜂蜜礼盒", 0.0, ("蜂蜜", "蜂蜜礼盒", "礼盒")),
     ]
     spus: list[Spu] = []
     for sid, title, brand, l1, l2, rating, kws in spu_rows:
@@ -81,6 +87,19 @@ def sample_catalog() -> tuple[list[Spu], list[Sku]]:
         ("sku_kindle_16g", "spu_kindle", 1188.0, 250, 3000, {"容量": "16G"}),
         ("sku_coffee_std", "spu_coffee_machine", 2499.0, 80, 1200, {"版本": "标准版"}),
         ("sku_coffee_pro", "spu_coffee_machine", 2999.0, 40, 800, {"版本": "Pro"}),
+        ("sku_acacia_250", "spu_honey_acacia", 29.9, 100, 0, {"净含量": "250g", "包装": "玻璃瓶"}),
+        ("sku_acacia_500", "spu_honey_acacia", 49.9, 100, 0, {"净含量": "500g", "包装": "玻璃瓶"}),
+        ("sku_acacia_1000", "spu_honey_acacia", 89.9, 60, 0, {"净含量": "1kg", "包装": "家庭装"}),
+        ("sku_jujube_500", "spu_honey_jujube", 55.9, 100, 0, {"净含量": "500g", "包装": "玻璃瓶"}),
+        ("sku_jujube_twin", "spu_honey_jujube", 99.0, 50, 0, {"净含量": "500g×2", "包装": "组合装"}),
+        ("sku_wildflower_500", "spu_honey_wildflower", 39.9, 120, 0, {"净含量": "500g", "包装": "挤压瓶"}),
+        ("sku_wildflower_1000", "spu_honey_wildflower", 69.9, 80, 0, {"净含量": "1kg", "包装": "家庭装"}),
+        ("sku_linden_500", "spu_honey_linden", 59.9, 80, 0, {"净含量": "500g", "包装": "玻璃瓶"}),
+        ("sku_linden_twin", "spu_honey_linden", 109.0, 40, 0, {"净含量": "500g×2", "包装": "组合装"}),
+        ("sku_royal_jelly_100", "spu_royal_jelly", 79.0, 60, 0, {"净含量": "100g", "储存": "冷藏"}),
+        ("sku_royal_jelly_200", "spu_royal_jelly", 139.0, 40, 0, {"净含量": "200g", "储存": "冷藏"}),
+        ("sku_honey_gift_2", "spu_honey_gift", 119.0, 50, 0, {"规格": "500g×2瓶", "包装": "礼盒"}),
+        ("sku_honey_gift_4", "spu_honey_gift", 219.0, 30, 0, {"规格": "500g×4瓶", "包装": "礼盒"}),
     ]
     skus = [
         Sku(sku_id=kid, spu_id=sid, price=price, stock=stock, sales=sales, attrs=attrs)
@@ -164,6 +183,9 @@ def sample_ads(spus: list[Spu] | None = None, skus: list[Sku] | None = None) -> 
         ("a6", "spu_sbux", "sku_sbux_50", BidType.CPC, 1.2, 1.0, 1.0, 0.02),
         ("a7", "spu_mask", "sku_mask_5", BidType.OCPC, 40.0, 0.9, 0.85, 0.05),
         ("a8", "spu_book", "sku_book_std", BidType.CPM, 25.0, 1.0, 1.0, 0.01),
+        ("a9", "spu_honey_acacia", "sku_acacia_500", BidType.OCPC, 30.0, 1.0, 1.0, 0.0),
+        ("a10", "spu_honey_wildflower", "sku_wildflower_500", BidType.OCPC, 25.0, 1.0, 1.0, 0.0),
+        ("a11", "spu_honey_gift", "sku_honey_gift_2", BidType.CPC, 1.0, 1.0, 1.0, 0.0),
     ]
     ads: list[Ad] = []
     for ad_id, sid, kid, bt, bid, q, stab, neg in specs:
@@ -215,8 +237,8 @@ def sample_user() -> User:
         gender="male",
         age_bucket="25-34",
         city_tier=1,
-        interests=("运动", "跑鞋", "数码"),
-        recent_cates=("跑鞋", "耳机"),
-        recent_queries=("跑鞋", "nike"),
+        interests=("食品", "蜂蜜", "蜂产品"),
+        recent_cates=("蜂蜜", "蜂产品"),
+        recent_queries=("蜂蜜", "槐花蜜"),
         freq_cap_today={"a8": 5},
     )

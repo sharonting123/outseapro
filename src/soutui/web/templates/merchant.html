@@ -3,7 +3,9 @@
 {% block content %}
 <div class="merchant-head">
   <div><h2>商家后台</h2><p class="meta">管理真实库存、订单和排序模型</p></div>
-  <form action="{{ base_path }}/merchant/train" method="post"><button class="btn" type="submit">训练并发布 CTR/CVR</button></form>
+  <div class="merchant-actions">
+    <form action="{{ base_path }}/merchant/train" method="post"><button class="btn" type="submit">训练并发布 CTR/CVR</button></form>
+  </div>
 </div>
 
 <div class="stats-grid">

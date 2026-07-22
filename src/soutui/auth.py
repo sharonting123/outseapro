@@ -16,6 +16,8 @@ from .store import Store
 
 COOKIE_NAME = "soutui_session"
 SESSION_TTL = 30 * 24 * 3600
+ADMIN_COOKIE_NAME = "soutui_admin_session"
+ADMIN_SESSION_TTL = 12 * 3600
 _SCRYPT_N = 2**14
 
 
@@ -106,4 +108,49 @@ def bootstrap_merchant(store: Store) -> None:
     store.create_user(
         "merchant_demo", email, hash_password(password),
         os.getenv("SOUTUI_BOOTSTRAP_MERCHANT_NAME", "平台商家"), "merchant",
+    )
+
+
+def authenticate_admin(store: Store, email: str, password: str) -> dict[str, Any] | None:
+    admin = store.get_admin_by_email(email, include_hash=True)
+    if not admin or not admin.get("is_active") or not verify_password(password, admin["password_hash"]):
+        return None
+    admin.pop("password_hash", None)
+    return admin
+
+
+def start_admin_session(store: Store, response: Response, admin_id: str) -> None:
+    token = secrets.token_urlsafe(32)
+    store.create_admin_session(token, admin_id, time.time() + ADMIN_SESSION_TTL)
+    response.set_cookie(
+        ADMIN_COOKIE_NAME,
+        token,
+        max_age=ADMIN_SESSION_TTL,
+        httponly=True,
+        samesite="strict",
+        secure=os.getenv("SOUTUI_SECURE_COOKIE", "0") == "1",
+        path="/admin",
+    )
+
+
+def end_admin_session(store: Store, request: Request, response: Response) -> None:
+    store.delete_admin_session(request.cookies.get(ADMIN_COOKIE_NAME, ""))
+    response.delete_cookie(ADMIN_COOKIE_NAME, path="/admin")
+
+
+def current_admin(request: Request, store: Store) -> dict[str, Any] | None:
+    return store.session_admin(request.cookies.get(ADMIN_COOKIE_NAME, ""))
+
+
+def bootstrap_admin(store: Store) -> None:
+    """Provision a separate administrator only from explicit deployment credentials."""
+    email = os.getenv("SOUTUI_BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
+    password = os.getenv("SOUTUI_BOOTSTRAP_ADMIN_PASSWORD", "")
+    if not email or not password or store.get_admin_by_email(email):
+        return
+    store.create_admin(
+        "admin_" + uuid.uuid4().hex[:16],
+        email,
+        hash_password(password),
+        os.getenv("SOUTUI_BOOTSTRAP_ADMIN_NAME", "平台管理员"),
     )

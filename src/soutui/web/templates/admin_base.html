@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}甄选管理后台{% endblock %}</title>
+  <link rel="stylesheet" href="{{ base_path }}/static/app.css" />
+</head>
+<body class="admin-body">
+  <header class="admin-shell-head">
+    <a class="admin-brand" href="{{ base_path }}/admin"><span>甄</span><b>运营管理台</b></a>
+    {% if admin %}
+    <div class="admin-session">
+      <span>{{ admin.display_name }}</span>
+      <form action="{{ base_path }}/admin/logout" method="post"><button class="admin-signout" type="submit">安全退出</button></form>
+    </div>
+    {% endif %}
+  </header>
+  <main class="admin-shell-main">
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

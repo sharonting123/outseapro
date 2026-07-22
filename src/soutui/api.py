@@ -21,7 +21,21 @@ from .mixer import FeedItem
 from .shop import ShopError, ShopService
 from .store import get_store
 from .trace import HUB
-from .auth import authenticate, bootstrap_merchant, current_user, end_session, hash_password, register, require_user, start_session
+from .auth import (
+    authenticate,
+    authenticate_admin,
+    bootstrap_admin,
+    bootstrap_merchant,
+    current_admin,
+    current_user,
+    end_admin_session,
+    end_session,
+    hash_password,
+    register,
+    require_user,
+    start_admin_session,
+    start_session,
+)
 from .payments import PaymentError, StripePaymentProvider
 from .training import DEFAULT_ARTIFACT, load_model_if_available, train
 
@@ -36,13 +50,16 @@ _shop: ShopService | None = None
 _model_checked_at = 0.0
 
 CATE_STYLE = {
-    "跑鞋": ("linear-gradient(145deg,#1e3a8a,#3b82f6)", "👟"),
-    "耳机": ("linear-gradient(145deg,#0f766e,#14b8a6)", "🎧"),
-    "手机配件": ("linear-gradient(145deg,#4c1d95,#8b5cf6)", "📱"),
-    "面膜": ("linear-gradient(145deg,#9d174d,#f472b6)", "✨"),
-    "咖啡": ("linear-gradient(145deg,#78350f,#d97706)", "☕"),
-    "童书": ("linear-gradient(145deg,#166534,#4ade80)", "📚"),
-    "电子书": ("linear-gradient(145deg,#1f2937,#6b7280)", "📖"),
+    "跑鞋": ("thumb-saffron", "👟"),
+    "耳机": ("thumb-caramel", "🎧"),
+    "手机配件": ("thumb-clay", "📱"),
+    "面膜": ("thumb-rosewood", "✨"),
+    "咖啡": ("thumb-cocoa", "☕"),
+    "童书": ("thumb-apricot", "📚"),
+    "电子书": ("thumb-walnut", "📖"),
+    "蜂蜜": ("thumb-honey", "🍯"),
+    "蜂产品": ("thumb-royal", "🐝"),
+    "蜂蜜礼盒": ("thumb-gift", "🎁"),
 }
 
 DEMO_USER = "u_demo"
@@ -82,11 +99,11 @@ def get_shop() -> ShopService:
 
 
 def _thumb(cate_l2: str) -> tuple[str, str]:
-    return CATE_STYLE.get(cate_l2, ("linear-gradient(145deg,#334155,#64748b)", "🛒"))
+    return CATE_STYLE.get(cate_l2, ("thumb-walnut", "🛒"))
 
 
 def _card_dict(item: FeedItem, sku_count: int = 1, price_from: float = 0.0) -> dict[str, Any]:
-    bg, emoji = _thumb(item.spu.cate_l2)
+    thumb_class, emoji = _thumb(item.spu.cate_l2)
     return {
         "position": item.position,
         "item_type": item.item_type.value,
@@ -110,7 +127,7 @@ def _card_dict(item: FeedItem, sku_count: int = 1, price_from: float = 0.0) -> d
         "ad_id": item.ad_id,
         "charge": round(item.charge, 4),
         "charge_unit": item.charge_unit,
-        "thumb_bg": bg,
+        "thumb_class": thumb_class,
         "thumb_emoji": emoji,
     }
 
@@ -135,6 +152,16 @@ def _base_ctx(request: Request | None = None, **extra: Any) -> dict[str, Any]:
         "query": "",
         "scene": "",
         "flash": "",
+        "error": "",
+    }
+    ctx.update(extra)
+    return ctx
+
+
+def _admin_ctx(request: Request, **extra: Any) -> dict[str, Any]:
+    ctx = {
+        "admin": current_admin(request, get_store()),
+        "base_path": BASE_PATH,
         "error": "",
     }
     ctx.update(extra)
@@ -208,7 +235,9 @@ def health() -> dict[str, Any]:
 
 @app.on_event("startup")
 def startup() -> None:
-    bootstrap_merchant(get_store())
+    store = get_store()
+    bootstrap_merchant(store)
+    bootstrap_admin(store)
 
 
 def _event_user(request: Request) -> str:
@@ -276,8 +305,10 @@ def change_password(request: Request, current_password: str = Form(...), new_pas
     return response
 
 
-@app.get("/trace/stream")
-async def trace_stream() -> StreamingResponse:
+@app.get("/admin/trace/stream")
+async def admin_trace_stream(request: Request) -> StreamingResponse:
+    if not current_admin(request, get_store()):
+        raise HTTPException(401, "管理员未登录")
     q = HUB.subscribe()
 
     async def gen():
@@ -329,13 +360,15 @@ def _run_search(q: str, page_size: int, hour: int, delay_ms: int, explain: bool)
 @app.get("/", response_class=HTMLResponse)
 async def home_page(
     request: Request,
+    tasks: BackgroundTasks,
     page_size: int = Query(12, ge=1, le=30),
-    delay_ms: int = Query(80, ge=0, le=800),
+    delay_ms: int = Query(0, ge=0, le=800),
 ):
     items, trace = await asyncio.to_thread(_run_feed, page_size, 12, delay_ms, True)
     engine = get_engine()
     rid = trace.request_id if trace else ""
-    log_impressions(
+    tasks.add_task(
+        log_impressions,
         get_store(),
         user_id=_event_user(request),
         request_id=rid,
@@ -361,14 +394,16 @@ async def home_page(
 @app.get("/search", response_class=HTMLResponse)
 async def search_page(
     request: Request,
+    tasks: BackgroundTasks,
     q: str = Query("跑鞋", min_length=1),
     page_size: int = Query(12, ge=1, le=30),
-    delay_ms: int = Query(80, ge=0, le=800),
+    delay_ms: int = Query(0, ge=0, le=800),
 ):
     items, trace = await asyncio.to_thread(_run_search, q, page_size, 12, delay_ms, True)
     engine = get_engine()
     rid = trace.request_id if trace else ""
-    log_impressions(
+    tasks.add_task(
+        log_impressions,
         get_store(),
         user_id=_event_user(request),
         request_id=rid,
@@ -424,7 +459,7 @@ async def item_page(
         extra={"page": "detail"},
     )
 
-    bg, emoji = _thumb(spu.cate_l2)
+    thumb_class, emoji = _thumb(spu.cate_l2)
     sku_views = [
         {
             "sku_id": s.sku_id,
@@ -449,7 +484,7 @@ async def item_page(
                 "stock": selected.stock,
             },
             price_from=spu_min_price(skus),
-            thumb_bg=bg,
+            thumb_class=thumb_class,
             thumb_emoji=emoji,
             request_id=rid,
         ),
@@ -524,6 +559,7 @@ async def api_track(request: Request, body: TrackBody):
 @app.get("/api/search", response_model=FeedResponse)
 async def api_search(
     request: Request,
+    tasks: BackgroundTasks,
     q: str = Query(..., min_length=1),
     page_size: int = Query(12, ge=1, le=30),
     hour: int = Query(12, ge=0, le=23),
@@ -533,7 +569,7 @@ async def api_search(
     items, trace = await asyncio.to_thread(_run_search, q, page_size, hour, delay_ms, bool(explain))
     engine = get_engine()
     rid = trace.request_id if trace else ""
-    log_impressions(get_store(), user_id=_event_user(request), request_id=rid, scene="search", query=q, items=items)
+    tasks.add_task(log_impressions, get_store(), user_id=_event_user(request), request_id=rid, scene="search", query=q, items=items)
     cards = [CardOut(**{k: v for k, v in c.items() if k in CardOut.model_fields}) for c in _pack_items(items, engine)]
     return FeedResponse(
         scene="search",
@@ -581,6 +617,88 @@ def merchant_dashboard(request: Request):
         request, "merchant.html",
         _base_ctx(request, scene="merchant", products=products, orders=orders, model_run=get_store().latest_model_run()),
     )
+
+
+def _run_algorithm_probe(mode: str, query: str, page_size: int):
+    """Run an isolated diagnostic without recording impressions or spending live budgets."""
+    active = get_engine()
+    probe = CommerceEngine(
+        spus=active.spus,
+        skus=active.skus,
+        model=active.ads_engine.ranker.model,
+    )
+    if mode == "search":
+        return probe.search(sample_user(), query, page_size=page_size, step_delay=0.0, explain=True)
+    return probe.feed(sample_user(), page_size=page_size, step_delay=0.0, explain=True)
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_algorithm_logs(
+    request: Request,
+    mode: str = Query("feed", pattern="^(feed|search)$"),
+    q: str = Query("蜂蜜", max_length=80),
+    page_size: int = Query(12, ge=1, le=30),
+):
+    if not current_admin(request, get_store()):
+        return RedirectResponse(_url("/admin/login?next=/admin"), status_code=303)
+    query = q.strip() or "蜂蜜"
+    items, trace = await asyncio.to_thread(_run_algorithm_probe, mode, query, page_size)
+    engine = get_engine()
+    cards = _pack_items(items, engine)
+    return templates.TemplateResponse(
+        request,
+        "algorithm_logs.html",
+        _admin_ctx(
+            request,
+            mode=mode,
+            query=query,
+            page_size=page_size,
+            items=cards,
+            organic_count=sum(1 for card in cards if not card["is_ad"]),
+            ad_count=sum(1 for card in cards if card["is_ad"]),
+            trace=trace.as_dict(),
+        ),
+    )
+
+
+@app.get("/admin/login", response_class=HTMLResponse)
+def admin_login_page(request: Request, next: str = Query("/admin")):
+    if current_admin(request, get_store()):
+        return RedirectResponse(_url("/admin"), status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "admin_login.html",
+        _admin_ctx(request, next=next),
+    )
+
+
+@app.post("/admin/login")
+def admin_login_submit(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    next: str = Form("/admin"),
+):
+    admin = authenticate_admin(get_store(), email, password)
+    if not admin:
+        return templates.TemplateResponse(
+            request,
+            "admin_login.html",
+            _admin_ctx(request, next=next, error="管理员邮箱或密码错误"),
+            status_code=400,
+        )
+    admin_root = _url("/admin")
+    target = next if next.startswith(admin_root) and not next.startswith("//") else admin_root
+    response = RedirectResponse(target, status_code=303)
+    start_admin_session(get_store(), response, admin["admin_id"])
+    return response
+
+
+@app.post("/admin/logout")
+def admin_logout(request: Request):
+    response = RedirectResponse(_url("/admin/login"), status_code=303)
+    end_admin_session(get_store(), request, response)
+    return response
 
 
 @app.post("/merchant/sku/{sku_id}")
@@ -633,6 +751,7 @@ def merchant_train(request: Request, tasks: BackgroundTasks):
 @app.get("/api/feed", response_model=FeedResponse)
 async def api_feed(
     request: Request,
+    tasks: BackgroundTasks,
     page_size: int = Query(12, ge=1, le=30),
     hour: int = Query(12, ge=0, le=23),
     delay_ms: int = Query(0, ge=0, le=800),
@@ -641,7 +760,7 @@ async def api_feed(
     items, trace = await asyncio.to_thread(_run_feed, page_size, hour, delay_ms, bool(explain))
     engine = get_engine()
     rid = trace.request_id if trace else ""
-    log_impressions(get_store(), user_id=_event_user(request), request_id=rid, scene="feed", query="", items=items)
+    tasks.add_task(log_impressions, get_store(), user_id=_event_user(request), request_id=rid, scene="feed", query="", items=items)
     cards = [CardOut(**{k: v for k, v in c.items() if k in CardOut.model_fields}) for c in _pack_items(items, engine)]
     return FeedResponse(
         scene="feed",

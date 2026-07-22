@@ -181,8 +181,9 @@ class ShopService:
 
     def sync_engine_stock(self, engine: Any) -> None:
         """把 DB 库存同步回内存 CommerceEngine.skus。"""
+        rows = self.store.get_skus([sku.sku_id for sku in engine.skus])
         for sku in engine.skus:
-            row = self.store.get_sku(sku.sku_id)
+            row = rows.get(sku.sku_id)
             if row:
                 sku.price = float(row["price"])
                 sku.stock = int(row["stock"])

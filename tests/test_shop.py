@@ -85,3 +85,20 @@ def test_impress_and_click_events(tmp_path: Path):
     impress = [e for e in evs if e["event_type"] == "impress"]
     assert impress[0]["sku_id"]
     assert impress[0]["request_id"]
+
+
+def test_sync_engine_stock_uses_bulk_lookup(tmp_path: Path):
+    store = Store(tmp_path / "bulk.db")
+    store.reset_seed()
+    engine = CommerceEngine()
+    calls = 0
+    original = store.get_skus
+
+    def counted(sku_ids):
+        nonlocal calls
+        calls += 1
+        return original(sku_ids)
+
+    store.get_skus = counted  # type: ignore[method-assign]
+    ShopService(store).sync_engine_stock(engine)
+    assert calls == 1

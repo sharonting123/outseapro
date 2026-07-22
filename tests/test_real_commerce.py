@@ -14,6 +14,18 @@ from soutui.store import Store
 from soutui.training import TrainedCtrCvrModel, train
 
 
+def test_catalog_upgrade_is_idempotent_and_preserves_existing_stock(tmp_path: Path):
+    db_path = tmp_path / "catalog-upgrade.db"
+    first = Store(db_path)
+    first.set_stock("sku_acacia_500", 7)
+    first.close()
+
+    upgraded = Store(db_path)
+    assert upgraded.get_stock("sku_acacia_500") == 7
+    assert upgraded.get_sku("sku_honey_gift_4") is not None
+    upgraded.close()
+
+
 def test_password_hash_and_session_user(tmp_path: Path):
     store = Store(tmp_path / "auth.db")
     encoded = hash_password("correct-horse")

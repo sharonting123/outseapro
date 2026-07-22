@@ -1,48 +1,39 @@
 {% extends "base.html" %}
-{% block title %}{% if scene == 'search' %}搜索 {{ query }} · 甄选{% else %}甄选蜂蜜 · 甄选{% endif %}{% endblock %}
+{% block title %}{% if scene == 'search' %}搜索 {{ query }} · 甄选{% else %}为你推荐 · 甄选{% endif %}{% endblock %}
 {% block content %}
 {% if scene == 'feed' %}
-<section class="hero" aria-labelledby="hero-title">
-  <div class="hero-honeycomb" aria-hidden="true"></div>
+<section class="hero">
+  <div class="hero-honeycomb"></div>
   <div class="hero-inner">
     <div class="hero-text">
-      <div class="hero-badge">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 9.5c0-2 1.6-3.5 3.5-3.5s3.5 1.5 3.5 3.5v5c0 2-1.6 3.5-3.5 3.5s-3.5-1.5-3.5-3.5v-5Z"/><path d="M8.8 10.5h6.4M8.8 14h6.4M9.5 7 7 4.5M14.5 7 17 4.5M8.5 11 4 9M15.5 11 20 9M8.5 15 4 17M15.5 15l4.5 2"/></svg>
-        蜂场直供 · 当季新蜜
-      </div>
-      <h1 class="hero-title" id="hero-title">每一滴，<br>都来自<span>山野深处</span>的蜂场</h1>
-      <p class="hero-sub">产地、成分与履约信息，以具体商品页为准</p>
+      <div class="hero-badge">🐝 蜂场直供 · 当季新蜜</div>
+      <h1 class="hero-title">每一滴，<br>都来自<span>山野深处</span>的蜂场</h1>
+      <p class="hero-sub">天然成熟蜜 · 0 添加 · 波美度 ≥ 42°</p>
       <div class="hero-cta">
-        <a class="cta-primary" href="#list">浏览推荐</a>
+        <a class="cta-primary" href="{{ base_path }}/search?q=蜂蜜">立即选购</a>
         <a class="cta-ghost" href="#honey-cats">了解蜜种</a>
       </div>
-      <dl class="hero-stats" aria-label="商品信息承诺">
-        <div class="stat"><dt>原产地</dt><dd>批次可追溯</dd></div>
-        <div class="stat"><dt>成分</dt><dd>商品页明示</dd></div>
-        <div class="stat"><dt>履约</dt><dd>订单可查询</dd></div>
-      </dl>
+      <div class="hero-stats">
+        <div class="stat"><b>42°+</b><span>波美度</span></div>
+        <div class="stat"><b>0</b><span>添加勾兑</span></div>
+        <div class="stat"><b>48h</b><span>蜂场发货</span></div>
+      </div>
     </div>
-    <div class="hero-art" aria-hidden="true">
-      <svg class="honey-illustration" viewBox="0 0 360 300">
-        <path class="bee-wing" d="M79 67C44 43 42 91 77 91M83 65c31-27 42 18 7 27"/>
-        <ellipse class="bee-body" cx="82" cy="82" rx="20" ry="13" transform="rotate(18 82 82)"/>
-        <path class="bee-stripe" d="m73 70-7 20m19-17-7 21"/>
-        <path class="jar-shadow" d="M100 249c20 22 141 25 164-1"/>
-        <path class="jar-lid" d="M123 78h116l-7 35H130l-7-35Z"/>
-        <path class="jar-glass" d="M130 109h102c10 18 17 35 17 62v62c0 25-17 38-42 38h-53c-25 0-42-13-42-38v-62c0-27 8-44 18-62Z"/>
-        <path class="jar-honey" d="M119 161c35-13 79 18 125-2v71c0 24-14 33-38 33h-51c-24 0-37-9-37-33l1-69Z"/>
-        <path class="jar-shine" d="M143 128c-12 20-15 47-13 70"/>
-        <path class="jar-label" d="M145 167h73v57h-73z"/>
-        <path class="jar-mark" d="M164 183c14-15 31-3 33 7 2 13-8 20-16 25-8-5-18-12-16-25"/>
-        <path class="honey-drip" d="M181 261c0 0-10 17-10 24a10 10 0 0 0 20 0c0-7-10-24-10-24Z"/>
-        <path class="flower-stem" d="M278 239c-4-42 6-73 28-99"/>
-        <g class="flower" transform="translate(307 132)"><circle r="12"/><circle cx="-13" cy="-3" r="10"/><circle cx="13" cy="-3" r="10"/><circle cy="-14" r="10"/><circle cy="13" r="10"/><circle class="flower-core" r="7"/></g>
-        <path class="leaf" d="M290 196c-31-14-35 12-6 22 11-4 13-12 6-22Zm6-24c22-26 38-4 15 17-11 1-17-6-15-17Z"/>
-      </svg>
-      <div class="hero-price-tag"><div class="pt-label">精选蜜品</div><div class="pt-price">价格以商品页为准</div></div>
+    <div class="hero-art">
+      <div class="hex hex-1">🍯</div>
+      <div class="hex hex-2">🌼</div>
+      <div class="hex hex-3">🐝</div>
+      <div class="honey-jar">
+        <div class="jar-emoji">🍯</div>
+        <div class="jar-drip"></div>
+      </div>
+      <div class="hero-price-tag">
+        <div class="pt-label">今日蜂场价</div>
+        <div class="pt-price"><small>¥</small>39.9<small> 起</small></div>
+      </div>
     </div>
   </div>
-  <nav class="hero-cats" id="honey-cats" aria-label="按蜜种选购">
+  <div class="hero-cats" id="honey-cats">
     <span class="cats-label">蜜种速选</span>
     <a href="{{ base_path }}/search?q=槐花蜜">槐花蜜</a>
     <a href="{{ base_path }}/search?q=枣花蜜">枣花蜜</a>
@@ -50,14 +41,14 @@
     <a href="{{ base_path }}/search?q=椴树蜜">椴树蜜</a>
     <a href="{{ base_path }}/search?q=蜂王浆">蜂王浆</a>
     <a href="{{ base_path }}/search?q=蜂蜜礼盒">蜂蜜礼盒</a>
-  </nav>
+  </div>
 </section>
-<section class="trust-strip" aria-label="购物服务说明">
-  <div class="trust-item"><b>产地</b><span>信息明示</span></div>
-  <div class="trust-item"><b>批次</b><span>详情可查</span></div>
-  <div class="trust-item"><b>订单</b><span>状态可查</span></div>
-  <div class="trust-item"><b>售后</b><span>规则公开</span></div>
-</section>
+<div class="trust-strip">
+  <div class="trust-item">🐝 蜂场直供</div>
+  <div class="trust-item">✅ 天然成熟蜜</div>
+  <div class="trust-item">🚚 顺丰包邮</div>
+  <div class="trust-item">🛡️ 假一赔十</div>
+</div>
 {% endif %}
 <div class="filter-bar">
   <div class="crumb">
@@ -73,7 +64,7 @@
   </div>
 </div>
 
-<div class="main-row storefront-row">
+<div class="main-row">
   <div class="grid" id="list">
     {% if not items %}
       <div class="empty" style="grid-column:1/-1">暂无商品</div>
@@ -91,7 +82,7 @@
        data-scene="{{ scene }}">
       <div class="thumb">
         {% if it.is_ad %}<span class="ad-tag">广告</span>{% endif %}
-        <div class="thumb-art {{ it.thumb_class }}">{{ it.thumb_emoji }}</div>
+        <div class="thumb-art" style="background:{{ it.thumb_bg }}">{{ it.thumb_emoji }}</div>
       </div>
       <div class="info">
         <div class="price-row">
@@ -111,12 +102,53 @@
     {% endfor %}
   </div>
 
+  <aside class="algo-panel">
+    <div class="algo-head">
+      <div><span class="live-dot" id="liveDot"></span><strong>算法实时日志</strong></div>
+      <span id="liveStatus">连接中…</span>
+    </div>
+    <div class="algo-body" id="algoLog">
+      {% if trace and trace.events %}
+        {% for e in trace.events %}
+        <div class="algo-step stage-{{ e.stage }}">
+          <div class="title">#{{ e.seq }} {{ e.title }}</div>
+          {% if e.formula %}<div class="formula">∴ {{ e.formula }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="algo-empty">本次请求轨迹会显示在这里</div>
+      {% endif %}
+    </div>
+  </aside>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
   const watchId = {{ (request_id or '')|tojson }};
+  const algoLog = document.getElementById('algoLog');
+  const liveStatus = document.getElementById('liveStatus');
+  function appendStep(ev) {
+    if (watchId && ev.request_id && ev.request_id !== watchId) return;
+    const el = document.createElement('div');
+    el.className = 'algo-step stage-' + (ev.stage || 'start');
+    el.innerHTML = `<div class="title">#${ev.seq||''} ${ev.title||''}</div>` +
+      (ev.formula ? `<div class="formula">∴ ${ev.formula}</div>` : '');
+    algoLog.appendChild(el);
+    algoLog.scrollTop = algoLog.scrollHeight;
+  }
+  const es = new EventSource({{ (base_path + '/trace/stream')|tojson }});
+  es.onopen = () => { liveStatus.textContent = '已连接'; };
+  es.onerror = () => { liveStatus.textContent = '重连中…'; };
+  es.onmessage = (msg) => {
+    try {
+      const ev = JSON.parse(msg.data);
+      if (ev.type === 'step') appendStep(ev);
+      if (ev.type === 'done' && (!watchId || ev.request_id === watchId)) {
+        liveStatus.textContent = `完成 · ${ev.steps||0} 步`;
+      }
+    } catch (_) {}
+  };
   document.querySelectorAll('[data-track]').forEach(a => {
     a.addEventListener('click', () => {
       const body = {

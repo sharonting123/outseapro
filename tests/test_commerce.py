@@ -86,3 +86,35 @@ def test_spu_sku_pick_by_query_attr():
     nike = next((r for r in organic if r.spu.spu_id == "spu_nike_zoom"), None)
     assert nike is not None
     assert nike.sku.attrs.get("颜色") == "白"
+
+
+def test_honey_queries_return_matching_products_and_skus():
+    engine = CommerceEngine()
+    cases = {
+        "槐花蜜": "spu_honey_acacia",
+        "枣花蜜": "spu_honey_jujube",
+        "百花蜜": "spu_honey_wildflower",
+        "椴树蜜": "spu_honey_linden",
+        "蜂王浆": "spu_royal_jelly",
+        "蜂蜜礼盒": "spu_honey_gift",
+    }
+    for query, spu_id in cases.items():
+        items, _ = engine.search(sample_user(), query, page_size=10)
+        match = next((x for x in items if x.spu.spu_id == spu_id), None)
+        assert match is not None, query
+        assert match.sku.spu_id == spu_id
+        assert match.sku.stock > 0
+
+
+def test_honey_catalog_has_multiple_sellable_skus():
+    engine = CommerceEngine()
+    honey_skus = [sku for sku in engine.skus if sku.spu_id.startswith("spu_honey_")]
+    assert len(honey_skus) >= 10
+    assert all(sku.price > 0 and sku.stock > 0 for sku in honey_skus)
+
+
+def test_honey_interest_feed_gives_new_honey_products_cold_start_exposure():
+    engine = CommerceEngine()
+    items, _ = engine.feed(sample_user(), page_size=10)
+    honey = [x for x in items if x.spu.cate_l2 in {"蜂蜜", "蜂产品", "蜂蜜礼盒"}]
+    assert len(honey) >= 4
