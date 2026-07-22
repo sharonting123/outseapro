@@ -19,7 +19,7 @@ def log_impressions(
     """列表曝光：冻结特征快照，供后续 CTR/CVR 训练。"""
     store = store or get_store()
     ts = time.time()
-    n = 0
+    events: list[dict[str, Any]] = []
     for it in items:
         feats = {k: v for k, v in (it.extra or {}).items() if isinstance(v, (int, float, str, bool))}
         # 嵌套结构单独放
@@ -34,25 +34,24 @@ def log_impressions(
             pcvr = float(pcvr)
         else:
             pcvr = None
-        store.insert_event(
-            event_type="impress",
-            user_id=user_id,
-            request_id=request_id,
-            scene=scene,
-            query=query,
-            spu_id=it.spu.spu_id,
-            sku_id=it.sku.sku_id,
-            position=it.position,
-            is_ad=it.is_ad,
-            ad_id=it.ad_id,
-            pctr=pctr,
-            pcvr=pcvr,
-            features=feats,
-            extra={"score": it.score, "nested": _safe_jsonable(nested)},
-            ts=ts,
-        )
-        n += 1
-    return n
+        events.append({
+            "event_type": "impress",
+            "user_id": user_id,
+            "request_id": request_id,
+            "scene": scene,
+            "query": query,
+            "spu_id": it.spu.spu_id,
+            "sku_id": it.sku.sku_id,
+            "position": it.position,
+            "is_ad": it.is_ad,
+            "ad_id": it.ad_id,
+            "pctr": pctr,
+            "pcvr": pcvr,
+            "features": feats,
+            "extra": {"score": it.score, "nested": _safe_jsonable(nested)},
+            "ts": ts,
+        })
+    return store.insert_events(events)
 
 
 def log_event(

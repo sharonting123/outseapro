@@ -379,6 +379,28 @@ class Store:
             finally:
                 conn.close()
 
+    def get_skus(self, sku_ids: list[str] | tuple[str, ...]) -> dict[str, dict[str, Any]]:
+        """Load a set of SKUs in one database round trip, keyed by sku_id."""
+        ids = list(dict.fromkeys(sku_ids))
+        if not ids:
+            return {}
+        placeholders = ",".join("?" for _ in ids)
+        with self._lock:
+            conn = self.connect()
+            try:
+                rows = conn.execute(
+                    f"SELECT * FROM skus WHERE sku_id IN ({placeholders})",
+                    tuple(ids),
+                ).fetchall()
+                out: dict[str, dict[str, Any]] = {}
+                for row in rows:
+                    item = dict(row)
+                    item["attrs"] = json.loads(item.pop("attrs_json"))
+                    out[item["sku_id"]] = item
+                return out
+            finally:
+                conn.close()
+
     def get_stock(self, sku_id: str) -> int:
         sku = self.get_sku(sku_id)
         return int(sku["stock"]) if sku else 0
@@ -996,6 +1018,48 @@ class Store:
                 event_id = int(cur.fetchone()["id"]) if self.is_postgres else int(cur.lastrowid)
                 conn.commit()
                 return event_id
+            finally:
+                conn.close()
+
+    def insert_events(self, events: list[dict[str, Any]]) -> int:
+        """Insert event rows with one statement and one commit."""
+        if not events:
+            return 0
+        columns = (
+            "event_type", "request_id", "user_id", "scene", "query", "spu_id", "sku_id",
+            "position", "is_ad", "ad_id", "pctr", "pcvr", "features_json", "extra_json", "ts",
+        )
+        values_sql = ",".join(
+            "(" + ",".join("?" for _ in columns) + ")" for _ in events
+        )
+        params: list[Any] = []
+        for event in events:
+            params.extend((
+                event.get("event_type", ""),
+                event.get("request_id", ""),
+                event.get("user_id", ""),
+                event.get("scene", ""),
+                event.get("query", ""),
+                event.get("spu_id", ""),
+                event.get("sku_id", ""),
+                int(event.get("position", -1)),
+                1 if event.get("is_ad", False) else 0,
+                event.get("ad_id", ""),
+                event.get("pctr"),
+                event.get("pcvr"),
+                json.dumps(event.get("features") or {}, ensure_ascii=False),
+                json.dumps(event.get("extra") or {}, ensure_ascii=False),
+                float(event["ts"]),
+            ))
+        with self._lock:
+            conn = self.connect()
+            try:
+                conn.execute(
+                    f"INSERT INTO events({','.join(columns)}) VALUES {values_sql}",
+                    tuple(params),
+                )
+                conn.commit()
+                return len(events)
             finally:
                 conn.close()
 

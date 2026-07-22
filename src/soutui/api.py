@@ -360,13 +360,15 @@ def _run_search(q: str, page_size: int, hour: int, delay_ms: int, explain: bool)
 @app.get("/", response_class=HTMLResponse)
 async def home_page(
     request: Request,
+    tasks: BackgroundTasks,
     page_size: int = Query(12, ge=1, le=30),
-    delay_ms: int = Query(80, ge=0, le=800),
+    delay_ms: int = Query(0, ge=0, le=800),
 ):
     items, trace = await asyncio.to_thread(_run_feed, page_size, 12, delay_ms, True)
     engine = get_engine()
     rid = trace.request_id if trace else ""
-    log_impressions(
+    tasks.add_task(
+        log_impressions,
         get_store(),
         user_id=_event_user(request),
         request_id=rid,
@@ -392,14 +394,16 @@ async def home_page(
 @app.get("/search", response_class=HTMLResponse)
 async def search_page(
     request: Request,
+    tasks: BackgroundTasks,
     q: str = Query("跑鞋", min_length=1),
     page_size: int = Query(12, ge=1, le=30),
-    delay_ms: int = Query(80, ge=0, le=800),
+    delay_ms: int = Query(0, ge=0, le=800),
 ):
     items, trace = await asyncio.to_thread(_run_search, q, page_size, 12, delay_ms, True)
     engine = get_engine()
     rid = trace.request_id if trace else ""
-    log_impressions(
+    tasks.add_task(
+        log_impressions,
         get_store(),
         user_id=_event_user(request),
         request_id=rid,
@@ -555,6 +559,7 @@ async def api_track(request: Request, body: TrackBody):
 @app.get("/api/search", response_model=FeedResponse)
 async def api_search(
     request: Request,
+    tasks: BackgroundTasks,
     q: str = Query(..., min_length=1),
     page_size: int = Query(12, ge=1, le=30),
     hour: int = Query(12, ge=0, le=23),
@@ -564,7 +569,7 @@ async def api_search(
     items, trace = await asyncio.to_thread(_run_search, q, page_size, hour, delay_ms, bool(explain))
     engine = get_engine()
     rid = trace.request_id if trace else ""
-    log_impressions(get_store(), user_id=_event_user(request), request_id=rid, scene="search", query=q, items=items)
+    tasks.add_task(log_impressions, get_store(), user_id=_event_user(request), request_id=rid, scene="search", query=q, items=items)
     cards = [CardOut(**{k: v for k, v in c.items() if k in CardOut.model_fields}) for c in _pack_items(items, engine)]
     return FeedResponse(
         scene="search",
@@ -746,6 +751,7 @@ def merchant_train(request: Request, tasks: BackgroundTasks):
 @app.get("/api/feed", response_model=FeedResponse)
 async def api_feed(
     request: Request,
+    tasks: BackgroundTasks,
     page_size: int = Query(12, ge=1, le=30),
     hour: int = Query(12, ge=0, le=23),
     delay_ms: int = Query(0, ge=0, le=800),
@@ -754,7 +760,7 @@ async def api_feed(
     items, trace = await asyncio.to_thread(_run_feed, page_size, hour, delay_ms, bool(explain))
     engine = get_engine()
     rid = trace.request_id if trace else ""
-    log_impressions(get_store(), user_id=_event_user(request), request_id=rid, scene="feed", query="", items=items)
+    tasks.add_task(log_impressions, get_store(), user_id=_event_user(request), request_id=rid, scene="feed", query="", items=items)
     cards = [CardOut(**{k: v for k, v in c.items() if k in CardOut.model_fields}) for c in _pack_items(items, engine)]
     return FeedResponse(
         scene="feed",
