@@ -1,8 +1,10 @@
 /* Hallmark · theme: Hum · macrostructure: Split Studio · component: H2 + F6 · enrichment: custom SVG */
 :root {
-  --color-brand: oklch(51% 0.105 215);
-  --color-brand-deep: oklch(43% 0.09 215);
-  --color-brand-soft: oklch(97% 0.018 210);
+  --color-brand: oklch(48% 0.145 61);
+  --color-brand-deep: oklch(34% 0.115 53);
+  --color-brand-soft: oklch(96% 0.04 86);
+  --color-accent: var(--color-brand);
+  --color-accent-ink: var(--color-on-honey);
   --color-paper: oklch(98% 0.008 75);
   --color-paper-warm: oklch(95% 0.025 75);
   --color-ink: oklch(24% 0.025 55);
@@ -17,8 +19,27 @@
   --color-honey-100: oklch(96% 0.04 86);
   --color-on-honey: oklch(97% 0.022 86);
   --color-focus: oklch(79% 0.17 84);
+  --color-surface: oklch(99% 0.006 78);
+  --color-surface-soft: oklch(96% 0.018 78);
+  --color-ink-soft: oklch(39% 0.035 55);
+  --color-ink-faint: oklch(61% 0.025 60);
+  --color-danger: oklch(48% 0.16 28);
+  --color-danger-soft: oklch(96% 0.035 28);
+  --color-danger-rule: oklch(84% 0.08 28);
+  --color-algo-bg: oklch(20% 0.045 48);
+  --color-algo-panel: oklch(25% 0.05 50);
+  --color-algo-head: oklch(35% 0.1 55);
+  --color-algo-text: oklch(93% 0.035 82);
+  --color-algo-muted: oklch(72% 0.035 72);
+  --color-algo-formula: oklch(84% 0.12 82);
+  --color-rosewood: oklch(46% 0.12 28);
+  --color-clay: oklch(57% 0.13 42);
+  --color-apricot: oklch(72% 0.14 62);
+  --color-walnut: oklch(31% 0.055 48);
+  --color-caramel: oklch(58% 0.14 65);
   --font-display: "Songti SC", "Noto Serif CJK SC", "STSong", serif;
   --font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "Noto Sans Mono CJK SC", monospace;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;

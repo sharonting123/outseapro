@@ -227,9 +227,9 @@ class Store:
                 conn.executescript(_POSTGRES_SCHEMA if self.is_postgres else _SCHEMA)
                 if not self.is_postgres:
                     self._migrate(conn)
-                n = conn.execute("SELECT COUNT(*) AS c FROM spus").fetchone()["c"]
-                if n == 0:
-                    self._seed(conn)
+                # Idempotently add catalog entries introduced by newer releases.
+                # ON CONFLICT keeps merchant-edited price, stock, and product rows intact.
+                self._seed(conn)
                 conn.commit()
             finally:
                 conn.close()

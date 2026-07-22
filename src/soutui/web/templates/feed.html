@@ -91,7 +91,7 @@
        data-scene="{{ scene }}">
       <div class="thumb">
         {% if it.is_ad %}<span class="ad-tag">广告</span>{% endif %}
-        <div class="thumb-art" style="background:{{ it.thumb_bg }}">{{ it.thumb_emoji }}</div>
+        <div class="thumb-art {{ it.thumb_class }}">{{ it.thumb_emoji }}</div>
       </div>
       <div class="info">
         <div class="price-row">

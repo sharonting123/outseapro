@@ -3,7 +3,7 @@
 {% block content %}
 <div class="panel detail-layout">
   <div class="thumb" style="aspect-ratio:auto;min-height:360px;border-radius:4px;">
-    <div class="thumb-art" style="background:{{ thumb_bg }};width:70%;height:70%;">{{ thumb_emoji }}</div>
+    <div class="thumb-art detail-thumb {{ thumb_class }}">{{ thumb_emoji }}</div>
   </div>
   <div>
     <h1 style="margin:0 0 8px;font-size:22px;">{{ spu.title }}</h1>
@@ -65,9 +65,9 @@
     const data = await r.json();
     const msg = document.getElementById('msg');
     if (r.status === 401) { location.href={{ (base_path + '/login?next=')|tojson }} + encodeURIComponent(location.pathname + location.search); return; }
-    if (!r.ok) { msg.textContent = data.detail || data.error || '加购失败'; msg.style.color='#c00'; return; }
+    if (!r.ok) { msg.textContent = data.detail || data.error || '加购失败'; msg.style.color='var(--color-danger)'; return; }
     msg.textContent = `已加入购物车（共 ${data.cart_count} 件）`;
-    msg.style.color = '#155e75';
+    msg.style.color = 'var(--brand-dark)';
   };
 </script>
 {% endblock %}

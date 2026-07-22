@@ -36,13 +36,16 @@ _shop: ShopService | None = None
 _model_checked_at = 0.0
 
 CATE_STYLE = {
-    "跑鞋": ("linear-gradient(145deg,#1e3a8a,#3b82f6)", "👟"),
-    "耳机": ("linear-gradient(145deg,#0f766e,#14b8a6)", "🎧"),
-    "手机配件": ("linear-gradient(145deg,#4c1d95,#8b5cf6)", "📱"),
-    "面膜": ("linear-gradient(145deg,#9d174d,#f472b6)", "✨"),
-    "咖啡": ("linear-gradient(145deg,#78350f,#d97706)", "☕"),
-    "童书": ("linear-gradient(145deg,#166534,#4ade80)", "📚"),
-    "电子书": ("linear-gradient(145deg,#1f2937,#6b7280)", "📖"),
+    "跑鞋": ("thumb-saffron", "👟"),
+    "耳机": ("thumb-caramel", "🎧"),
+    "手机配件": ("thumb-clay", "📱"),
+    "面膜": ("thumb-rosewood", "✨"),
+    "咖啡": ("thumb-cocoa", "☕"),
+    "童书": ("thumb-apricot", "📚"),
+    "电子书": ("thumb-walnut", "📖"),
+    "蜂蜜": ("thumb-honey", "🍯"),
+    "蜂产品": ("thumb-royal", "🐝"),
+    "蜂蜜礼盒": ("thumb-gift", "🎁"),
 }
 
 DEMO_USER = "u_demo"
@@ -82,11 +85,11 @@ def get_shop() -> ShopService:
 
 
 def _thumb(cate_l2: str) -> tuple[str, str]:
-    return CATE_STYLE.get(cate_l2, ("linear-gradient(145deg,#334155,#64748b)", "🛒"))
+    return CATE_STYLE.get(cate_l2, ("thumb-walnut", "🛒"))
 
 
 def _card_dict(item: FeedItem, sku_count: int = 1, price_from: float = 0.0) -> dict[str, Any]:
-    bg, emoji = _thumb(item.spu.cate_l2)
+    thumb_class, emoji = _thumb(item.spu.cate_l2)
     return {
         "position": item.position,
         "item_type": item.item_type.value,
@@ -110,7 +113,7 @@ def _card_dict(item: FeedItem, sku_count: int = 1, price_from: float = 0.0) -> d
         "ad_id": item.ad_id,
         "charge": round(item.charge, 4),
         "charge_unit": item.charge_unit,
-        "thumb_bg": bg,
+        "thumb_class": thumb_class,
         "thumb_emoji": emoji,
     }
 
@@ -424,7 +427,7 @@ async def item_page(
         extra={"page": "detail"},
     )
 
-    bg, emoji = _thumb(spu.cate_l2)
+    thumb_class, emoji = _thumb(spu.cate_l2)
     sku_views = [
         {
             "sku_id": s.sku_id,
@@ -449,7 +452,7 @@ async def item_page(
                 "stock": selected.stock,
             },
             price_from=spu_min_price(skus),
-            thumb_bg=bg,
+            thumb_class=thumb_class,
             thumb_emoji=emoji,
             request_id=rid,
         ),

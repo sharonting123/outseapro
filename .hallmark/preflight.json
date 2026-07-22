@@ -2,7 +2,7 @@
   "date": "2026-07-22",
   "framework": "FastAPI + Jinja2 + vanilla CSS",
   "font_stack": "Songti SC/Noto Serif CJK SC display + PingFang SC/Microsoft YaHei body; existing mono stack retained for algorithm logs",
-  "palette": "Existing teal commerce shell plus tokenized OKLCH warm amber Hum homepage",
+  "palette": "Sitewide tokenized OKLCH Hum palette: warm paper, honey amber, caramel, clay, cocoa, and deep brown",
   "motion": "CSS-only honey pulse and interaction feedback; reduced-motion fallback included",
   "spacing": "4px named spacing scale for new homepage; legacy shell spacing preserved",
   "sources": [
