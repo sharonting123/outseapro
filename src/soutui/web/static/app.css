@@ -296,6 +296,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   margin-block: var(--space-2) var(--space-5);
 }
 .workbench-head h2, .workbench-title h3 { margin: 0 0 var(--space-1); }
+.admin-eyebrow {
+  margin: 0 0 var(--space-2);
+  color: var(--color-accent);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
 .algorithm-controls {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr) minmax(0, 0.7fr) auto;

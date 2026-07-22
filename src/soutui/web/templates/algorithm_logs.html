@@ -1,15 +1,16 @@
 {% extends "base.html" %}
-{% block title %}算法日志后台 · 甄选{% endblock %}
+{% block title %}管理后台 · 甄选{% endblock %}
 {% block content %}
 <header class="workbench-head">
   <div>
-    <h2>算法日志后台</h2>
-    <p class="meta">独立运行一次推荐或搜索诊断，不写入用户曝光，也不消耗正式广告预算。</p>
+    <p class="admin-eyebrow">ADMIN ONLY</p>
+    <h2>管理后台 · 算法日志</h2>
+    <p class="meta">仅管理员可运行推荐或搜索诊断；不写入用户曝光，也不消耗正式广告预算。</p>
   </div>
-  <a class="btn ghost" href="{{ base_path }}/merchant">返回商家后台</a>
+  <a class="btn ghost" href="{{ base_path }}/">返回商城</a>
 </header>
 
-<form class="panel algorithm-controls" method="get" action="{{ base_path }}/merchant/algorithm">
+<form class="panel algorithm-controls" method="get" action="{{ base_path }}/admin">
   <label>运行场景
     <select name="mode">
       <option value="feed" {% if mode == 'feed' %}selected{% endif %}>首页推荐</option>

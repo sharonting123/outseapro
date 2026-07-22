@@ -599,14 +599,14 @@ def _run_algorithm_probe(mode: str, query: str, page_size: int):
     return probe.feed(sample_user(), page_size=page_size, step_delay=0.0, explain=True)
 
 
-@app.get("/merchant/algorithm", response_class=HTMLResponse)
-async def merchant_algorithm_logs(
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_algorithm_logs(
     request: Request,
     mode: str = Query("feed", pattern="^(feed|search)$"),
     q: str = Query("蜂蜜", max_length=80),
     page_size: int = Query(12, ge=1, le=30),
 ):
-    require_user(request, get_store(), "merchant")
+    require_user(request, get_store(), "admin")
     query = q.strip() or "蜂蜜"
     items, trace = await asyncio.to_thread(_run_algorithm_probe, mode, query, page_size)
     engine = get_engine()
@@ -616,7 +616,7 @@ async def merchant_algorithm_logs(
         "algorithm_logs.html",
         _base_ctx(
             request,
-            scene="algorithm",
+            scene="admin",
             mode=mode,
             query=query,
             page_size=page_size,

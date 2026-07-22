@@ -1,16 +1,16 @@
 [
   {
     "date": "2026-07-22",
-    "scope": "merchant-only algorithm diagnostics backend",
+    "scope": "admin-only algorithm diagnostics backend at /admin",
     "macrostructure": "Workbench",
     "theme": "Hum",
-    "components": ["merchant navigation", "diagnostic controls", "summary strip", "trace records"],
+    "components": ["admin-only navigation", "diagnostic controls", "summary strip", "trace records"],
     "enrichment": "none",
     "motion": [],
     "critique": {"philosophy": 5, "hierarchy": 5, "execution": 5, "specificity": 5, "restraint": 5, "variety": 5},
     "slop_test": "pass 58/58 for the merchant algorithm backend surface",
     "responsive": "pass at 320, 375, 414, 768, and 1280 CSS pixels; no horizontal overflow",
-    "notes": "Removed algorithm logs from the public storefront. Added a merchant/admin-only diagnostic route that runs isolated feed or search probes without logging impressions or spending the active engine budget."
+    "notes": "Removed all merchant access and links. The dedicated /admin entry requires the admin role and runs isolated feed or search probes without logging impressions or spending the active engine budget."
   },
   {
     "date": "2026-07-22",
