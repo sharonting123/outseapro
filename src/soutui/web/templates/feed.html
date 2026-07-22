@@ -113,20 +113,11 @@
 
   <aside class="algo-panel">
     <div class="algo-head">
-      <div><span class="live-dot" id="liveDot"></span><strong>算法实时日志</strong></div>
-      <span id="liveStatus">连接中…</span>
+      <div><span class="live-dot" id="liveDot"></span><strong>算法执行日志</strong></div>
+      <span id="liveStatus">载入中…</span>
     </div>
     <div class="algo-body" id="algoLog">
-      {% if trace and trace.events %}
-        {% for e in trace.events %}
-        <div class="algo-step stage-{{ e.stage }}">
-          <div class="title">#{{ e.seq }} {{ e.title }}</div>
-          {% if e.formula %}<div class="formula">∴ {{ e.formula }}</div>{% endif %}
-        </div>
-        {% endfor %}
-      {% else %}
-        <div class="algo-empty">本次请求轨迹会显示在这里</div>
-      {% endif %}
+      <div class="algo-empty" id="algoEmpty">正在准备本次请求轨迹…</div>
     </div>
   </aside>
 </div>
@@ -135,29 +126,42 @@
 {% block scripts %}
 <script>
   const watchId = {{ (request_id or '')|tojson }};
+  const initialTraceEvents = {{ (trace.events if trace and trace.events else [])|tojson }};
   const algoLog = document.getElementById('algoLog');
   const liveStatus = document.getElementById('liveStatus');
   function appendStep(ev) {
-    if (watchId && ev.request_id && ev.request_id !== watchId) return;
+    document.getElementById('algoEmpty')?.remove();
     const el = document.createElement('div');
     el.className = 'algo-step stage-' + (ev.stage || 'start');
-    el.innerHTML = `<div class="title">#${ev.seq||''} ${ev.title||''}</div>` +
-      (ev.formula ? `<div class="formula">∴ ${ev.formula}</div>` : '');
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = `#${ev.seq || ''} ${ev.title || ''}`;
+    el.appendChild(title);
+    if (ev.formula) {
+      const formula = document.createElement('div');
+      formula.className = 'formula';
+      formula.textContent = `∴ ${ev.formula}`;
+      el.appendChild(formula);
+    }
     algoLog.appendChild(el);
     algoLog.scrollTop = algoLog.scrollHeight;
   }
-  const es = new EventSource({{ (base_path + '/trace/stream')|tojson }});
-  es.onopen = () => { liveStatus.textContent = '已连接'; };
-  es.onerror = () => { liveStatus.textContent = '重连中…'; };
-  es.onmessage = (msg) => {
-    try {
-      const ev = JSON.parse(msg.data);
-      if (ev.type === 'step') appendStep(ev);
-      if (ev.type === 'done' && (!watchId || ev.request_id === watchId)) {
-        liveStatus.textContent = `完成 · ${ev.steps||0} 步`;
-      }
-    } catch (_) {}
-  };
+  async function playTrace(events) {
+    if (!events.length) {
+      document.getElementById('algoEmpty').textContent = '本次请求没有生成算法轨迹';
+      liveStatus.textContent = '无轨迹';
+      return;
+    }
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const interval = reduceMotion ? 0 : 110;
+    for (let i = 0; i < events.length; i += 1) {
+      liveStatus.textContent = `执行中 · ${i + 1}/${events.length}`;
+      appendStep(events[i]);
+      if (interval) await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    liveStatus.textContent = `完成 · ${events.length} 步`;
+  }
+  playTrace(initialTraceEvents);
   document.querySelectorAll('[data-track]').forEach(a => {
     a.addEventListener('click', () => {
       const body = {
