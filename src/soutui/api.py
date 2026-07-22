@@ -586,6 +586,48 @@ def merchant_dashboard(request: Request):
     )
 
 
+def _run_algorithm_probe(mode: str, query: str, page_size: int):
+    """Run an isolated diagnostic without recording impressions or spending live budgets."""
+    active = get_engine()
+    probe = CommerceEngine(
+        spus=active.spus,
+        skus=active.skus,
+        model=active.ads_engine.ranker.model,
+    )
+    if mode == "search":
+        return probe.search(sample_user(), query, page_size=page_size, step_delay=0.0, explain=True)
+    return probe.feed(sample_user(), page_size=page_size, step_delay=0.0, explain=True)
+
+
+@app.get("/merchant/algorithm", response_class=HTMLResponse)
+async def merchant_algorithm_logs(
+    request: Request,
+    mode: str = Query("feed", pattern="^(feed|search)$"),
+    q: str = Query("蜂蜜", max_length=80),
+    page_size: int = Query(12, ge=1, le=30),
+):
+    require_user(request, get_store(), "merchant")
+    query = q.strip() or "蜂蜜"
+    items, trace = await asyncio.to_thread(_run_algorithm_probe, mode, query, page_size)
+    engine = get_engine()
+    cards = _pack_items(items, engine)
+    return templates.TemplateResponse(
+        request,
+        "algorithm_logs.html",
+        _base_ctx(
+            request,
+            scene="algorithm",
+            mode=mode,
+            query=query,
+            page_size=page_size,
+            items=cards,
+            organic_count=sum(1 for card in cards if not card["is_ad"]),
+            ad_count=sum(1 for card in cards if card["is_ad"]),
+            trace=trace.as_dict(),
+        ),
+    )
+
+
 @app.post("/merchant/sku/{sku_id}")
 def merchant_update_sku(request: Request, sku_id: str, price: float = Form(...), stock: int = Form(...)):
     user = require_user(request, get_store(), "merchant")

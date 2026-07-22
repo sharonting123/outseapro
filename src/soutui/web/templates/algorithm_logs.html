@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}算法日志后台 · 甄选{% endblock %}
+{% block content %}
+<header class="workbench-head">
+  <div>
+    <h2>算法日志后台</h2>
+    <p class="meta">独立运行一次推荐或搜索诊断，不写入用户曝光，也不消耗正式广告预算。</p>
+  </div>
+  <a class="btn ghost" href="{{ base_path }}/merchant">返回商家后台</a>
+</header>
+
+<form class="panel algorithm-controls" method="get" action="{{ base_path }}/merchant/algorithm">
+  <label>运行场景
+    <select name="mode">
+      <option value="feed" {% if mode == 'feed' %}selected{% endif %}>首页推荐</option>
+      <option value="search" {% if mode == 'search' %}selected{% endif %}>关键词搜索</option>
+    </select>
+  </label>
+  <label>搜索关键词
+    <input name="q" value="{{ query }}" placeholder="例如：槐花蜜" />
+  </label>
+  <label>返回数量
+    <input name="page_size" type="number" min="1" max="30" value="{{ page_size }}" />
+  </label>
+  <button class="btn" type="submit">运行诊断</button>
+</form>
+
+<section class="algorithm-summary" aria-label="本次诊断摘要">
+  <div class="stat"><b>{{ trace.events|length }}</b><span>执行步骤</span></div>
+  <div class="stat"><b>{{ items|length }}</b><span>返回商品</span></div>
+  <div class="stat"><b>{{ organic_count }}</b><span>自然结果</span></div>
+  <div class="stat"><b>{{ ad_count }}</b><span>广告结果</span></div>
+</section>
+
+<section class="algorithm-workbench" aria-labelledby="trace-title">
+  <div class="workbench-title">
+    <div><h3 id="trace-title">请求 {{ trace.request_id }}</h3><p class="meta">{{ '搜索：' ~ query if mode == 'search' else '首页推荐' }}</p></div>
+    <span class="trace-complete">已完成</span>
+  </div>
+  <div class="algorithm-records">
+    {% for event in trace.events %}
+    <article class="algorithm-record stage-{{ event.stage }}">
+      <div class="record-seq">{{ '%02d'|format(event.seq) }}</div>
+      <div class="record-main">
+        <div class="record-heading"><strong>{{ event.title }}</strong><span>{{ event.stage }}</span></div>
+        {% if event.formula %}<code>{{ event.formula }}</code>{% endif %}
+        {% if event.detail %}<details><summary>查看上下文</summary><pre>{{ event.detail|tojson }}</pre></details>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

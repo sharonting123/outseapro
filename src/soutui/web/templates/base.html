@@ -16,7 +16,7 @@
         {% if current_user %}
           <span>{{ current_user.display_name }}</span>
           <a href="{{ base_path }}/account">账户</a>
-          {% if current_user.role in ['merchant', 'admin'] %}<a href="{{ base_path }}/merchant">商家后台</a>{% endif %}
+          {% if current_user.role in ['merchant', 'admin'] %}<a href="{{ base_path }}/merchant">商家后台</a><a href="{{ base_path }}/merchant/algorithm">算法后台</a>{% endif %}
           <form class="inline-form" action="{{ base_path }}/logout" method="post"><button class="link-btn" type="submit">退出</button></form>
         {% else %}
           <a href="{{ base_path }}/login">登录</a><a href="{{ base_path }}/register">注册</a>
@@ -52,6 +52,7 @@
         <a href="{{ base_path }}/search?q={{ query or '跑鞋' }}" class="{% if scene == 'search' %}active{% endif %}">搜索结果</a>
         <a href="{{ base_path }}/cart">购物车{% if cart_count %}<span class="cart-badge">{{ cart_count }}</span>{% endif %}</a>
         {% if current_user and current_user.role in ['merchant', 'admin'] %}<a href="{{ base_path }}/merchant" class="{% if scene == 'merchant' %}active{% endif %}">商家后台</a>{% endif %}
+        {% if current_user and current_user.role in ['merchant', 'admin'] %}<a href="{{ base_path }}/merchant/algorithm" class="{% if scene == 'algorithm' %}active{% endif %}">算法后台</a>{% endif %}
       </div>
     </div>
   </div>
