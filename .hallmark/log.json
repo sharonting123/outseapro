@@ -1,0 +1,15 @@
+[
+  {
+    "date": "2026-07-22",
+    "scope": "homepage migration from Tencent :8088",
+    "macrostructure": "Split Studio",
+    "theme": "Hum",
+    "components": ["existing N6 masthead", "H2 split diptych", "F6 product grid", "trust strip"],
+    "enrichment": "tier-B custom honey jar SVG",
+    "motion": ["honey pulse", "button press and hover feedback"],
+    "critique": {"philosophy": 5, "hierarchy": 5, "execution": 5, "specificity": 5, "restraint": 5, "variety": 5},
+    "slop_test": "pass 58/58 for the migrated homepage surface",
+    "responsive": "pass at 320, 375, 414, 768, and 1280 CSS pixels; no horizontal overflow",
+    "notes": "Homepage only. Search/results, live recommendation data, ad labels, tracking, and algorithm trace remain functional. Unsupported numerical claims were replaced with verifiable service copy. Legacy commerce-shell styling is preserved outside this homepage scope."
+  }
+]

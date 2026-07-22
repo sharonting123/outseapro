@@ -1,0 +1,22 @@
+{
+  "date": "2026-07-22",
+  "framework": "FastAPI + Jinja2 + vanilla CSS",
+  "font_stack": "Songti SC/Noto Serif CJK SC display + PingFang SC/Microsoft YaHei body; existing mono stack retained for algorithm logs",
+  "palette": "Existing teal commerce shell plus tokenized OKLCH warm amber Hum homepage",
+  "motion": "CSS-only honey pulse and interaction feedback; reduced-motion fallback included",
+  "spacing": "4px named spacing scale for new homepage; legacy shell spacing preserved",
+  "sources": [
+    "src/soutui/web/templates/base.html",
+    "src/soutui/web/templates/feed.html",
+    "src/soutui/web/static/app.css",
+    "src/soutui/web/static/tokens.css",
+    "src/soutui/web/templates/feed.tencent-8088.html"
+  ],
+  "preserve": [
+    "FastAPI/Jinja rendering contract",
+    "live product and recommendation data",
+    "authentication/cart navigation",
+    "algorithm trace panel",
+    "homepage-only scope; search layout remains unchanged"
+  ]
+}
