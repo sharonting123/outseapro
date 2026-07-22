@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "admin_base.html" %}
 {% block title %}管理后台 · 甄选{% endblock %}
 {% block content %}
 <header class="workbench-head">
@@ -7,7 +7,7 @@
     <h2>管理后台 · 算法日志</h2>
     <p class="meta">仅管理员可运行推荐或搜索诊断；不写入用户曝光，也不消耗正式广告预算。</p>
   </div>
-  <a class="btn ghost" href="{{ base_path }}/">返回商城</a>
+  <span class="admin-identity">{{ admin.display_name }} · {{ admin.email }}</span>
 </header>
 
 <form class="panel algorithm-controls" method="get" action="{{ base_path }}/admin">

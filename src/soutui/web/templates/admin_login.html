@@ -1,0 +1,18 @@
+{% extends "admin_base.html" %}
+{% block title %}管理员登录 · 甄选{% endblock %}
+{% block content %}
+<section class="admin-login" aria-labelledby="admin-login-title">
+  <div class="admin-login-copy">
+    <p class="admin-eyebrow">PRIVATE OPERATIONS</p>
+    <h1 id="admin-login-title">管理员登录</h1>
+    <p>这是与商城及商家账号完全隔离的运营入口。管理员身份和会话单独保存在 Supabase。</p>
+  </div>
+  <form method="post" action="{{ base_path }}/admin/login" class="admin-login-form">
+    <input type="hidden" name="next" value="{{ next or '/admin' }}" />
+    <label>管理员邮箱<input type="email" name="email" autocomplete="username" required autofocus /></label>
+    <label>管理员密码<input type="password" name="password" autocomplete="current-password" required /></label>
+    <button class="btn" type="submit">进入管理后台</button>
+    <p>不提供公开注册。管理员账号由平台在 Supabase 中授权。</p>
+  </form>
+</section>
+{% endblock %}

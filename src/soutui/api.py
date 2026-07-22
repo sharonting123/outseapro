@@ -21,7 +21,21 @@ from .mixer import FeedItem
 from .shop import ShopError, ShopService
 from .store import get_store
 from .trace import HUB
-from .auth import authenticate, bootstrap_merchant, current_user, end_session, hash_password, register, require_user, start_session
+from .auth import (
+    authenticate,
+    authenticate_admin,
+    bootstrap_admin,
+    bootstrap_merchant,
+    current_admin,
+    current_user,
+    end_admin_session,
+    end_session,
+    hash_password,
+    register,
+    require_user,
+    start_admin_session,
+    start_session,
+)
 from .payments import PaymentError, StripePaymentProvider
 from .training import DEFAULT_ARTIFACT, load_model_if_available, train
 
@@ -144,6 +158,16 @@ def _base_ctx(request: Request | None = None, **extra: Any) -> dict[str, Any]:
     return ctx
 
 
+def _admin_ctx(request: Request, **extra: Any) -> dict[str, Any]:
+    ctx = {
+        "admin": current_admin(request, get_store()),
+        "base_path": BASE_PATH,
+        "error": "",
+    }
+    ctx.update(extra)
+    return ctx
+
+
 class CardOut(BaseModel):
     position: int
     item_type: str
@@ -211,7 +235,9 @@ def health() -> dict[str, Any]:
 
 @app.on_event("startup")
 def startup() -> None:
-    bootstrap_merchant(get_store())
+    store = get_store()
+    bootstrap_merchant(store)
+    bootstrap_admin(store)
 
 
 def _event_user(request: Request) -> str:
@@ -279,8 +305,10 @@ def change_password(request: Request, current_password: str = Form(...), new_pas
     return response
 
 
-@app.get("/trace/stream")
-async def trace_stream() -> StreamingResponse:
+@app.get("/admin/trace/stream")
+async def admin_trace_stream(request: Request) -> StreamingResponse:
+    if not current_admin(request, get_store()):
+        raise HTTPException(401, "管理员未登录")
     q = HUB.subscribe()
 
     async def gen():
@@ -606,7 +634,8 @@ async def admin_algorithm_logs(
     q: str = Query("蜂蜜", max_length=80),
     page_size: int = Query(12, ge=1, le=30),
 ):
-    require_user(request, get_store(), "admin")
+    if not current_admin(request, get_store()):
+        return RedirectResponse(_url("/admin/login?next=/admin"), status_code=303)
     query = q.strip() or "蜂蜜"
     items, trace = await asyncio.to_thread(_run_algorithm_probe, mode, query, page_size)
     engine = get_engine()
@@ -614,9 +643,8 @@ async def admin_algorithm_logs(
     return templates.TemplateResponse(
         request,
         "algorithm_logs.html",
-        _base_ctx(
+        _admin_ctx(
             request,
-            scene="admin",
             mode=mode,
             query=query,
             page_size=page_size,
@@ -626,6 +654,46 @@ async def admin_algorithm_logs(
             trace=trace.as_dict(),
         ),
     )
+
+
+@app.get("/admin/login", response_class=HTMLResponse)
+def admin_login_page(request: Request, next: str = Query("/admin")):
+    if current_admin(request, get_store()):
+        return RedirectResponse(_url("/admin"), status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "admin_login.html",
+        _admin_ctx(request, next=next),
+    )
+
+
+@app.post("/admin/login")
+def admin_login_submit(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    next: str = Form("/admin"),
+):
+    admin = authenticate_admin(get_store(), email, password)
+    if not admin:
+        return templates.TemplateResponse(
+            request,
+            "admin_login.html",
+            _admin_ctx(request, next=next, error="管理员邮箱或密码错误"),
+            status_code=400,
+        )
+    admin_root = _url("/admin")
+    target = next if next.startswith(admin_root) and not next.startswith("//") else admin_root
+    response = RedirectResponse(target, status_code=303)
+    start_admin_session(get_store(), response, admin["admin_id"])
+    return response
+
+
+@app.post("/admin/logout")
+def admin_logout(request: Request):
+    response = RedirectResponse(_url("/admin/login"), status_code=303)
+    end_admin_session(get_store(), request, response)
+    return response
 
 
 @app.post("/merchant/sku/{sku_id}")

@@ -110,6 +110,23 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
+CREATE TABLE IF NOT EXISTS admin_users (
+  admin_id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token_hash TEXT PRIMARY KEY,
+  admin_id TEXT NOT NULL REFERENCES admin_users(admin_id) ON DELETE CASCADE,
+  expires_at REAL NOT NULL,
+  created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
+
 CREATE TABLE IF NOT EXISTS model_runs (
   run_id TEXT PRIMARY KEY,
   status TEXT NOT NULL,
@@ -710,6 +727,83 @@ class Store:
             conn = self.connect()
             try:
                 conn.execute("DELETE FROM sessions WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),))
+                conn.commit()
+            finally:
+                conn.close()
+
+    # ----- isolated administrator identities / sessions -----
+
+    def create_admin(self, admin_id: str, email: str, password_hash: str, display_name: str) -> dict[str, Any]:
+        with self._lock:
+            conn = self.connect()
+            try:
+                conn.execute(
+                    "INSERT INTO admin_users(admin_id,email,password_hash,display_name,created_at) VALUES(?,?,?,?,?)",
+                    (admin_id, email.strip().lower(), password_hash, display_name.strip(), time.time()),
+                )
+                conn.commit()
+                return self._public_admin(conn.execute("SELECT * FROM admin_users WHERE admin_id=?", (admin_id,)).fetchone())
+            finally:
+                conn.close()
+
+    @staticmethod
+    def _public_admin(row: Any) -> dict[str, Any]:
+        data = dict(row)
+        data.pop("password_hash", None)
+        return data
+
+    def get_admin_by_email(self, email: str, include_hash: bool = False) -> dict[str, Any] | None:
+        with self._lock:
+            conn = self.connect()
+            try:
+                row = conn.execute("SELECT * FROM admin_users WHERE email=?", (email.strip().lower(),)).fetchone()
+                if not row:
+                    return None
+                data = dict(row)
+                if not include_hash:
+                    data.pop("password_hash", None)
+                return data
+            finally:
+                conn.close()
+
+    def create_admin_session(self, token: str, admin_id: str, expires_at: float) -> None:
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with self._lock:
+            conn = self.connect()
+            try:
+                conn.execute("DELETE FROM admin_sessions WHERE expires_at<=?", (time.time(),))
+                conn.execute(
+                    "INSERT INTO admin_sessions(token_hash,admin_id,expires_at,created_at) VALUES(?,?,?,?)",
+                    (token_hash, admin_id, expires_at, time.time()),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def session_admin(self, token: str) -> dict[str, Any] | None:
+        if not token:
+            return None
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with self._lock:
+            conn = self.connect()
+            try:
+                row = conn.execute(
+                    "SELECT a.* FROM admin_sessions s JOIN admin_users a ON a.admin_id=s.admin_id "
+                    "WHERE s.token_hash=? AND s.expires_at>? AND a.is_active=1",
+                    (token_hash, time.time()),
+                ).fetchone()
+                return self._public_admin(row) if row else None
+            finally:
+                conn.close()
+
+    def delete_admin_session(self, token: str) -> None:
+        if not token:
+            return
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with self._lock:
+            conn = self.connect()
+            try:
+                conn.execute("DELETE FROM admin_sessions WHERE token_hash=?", (token_hash,))
                 conn.commit()
             finally:
                 conn.close()

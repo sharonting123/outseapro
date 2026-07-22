@@ -1,16 +1,16 @@
 [
   {
     "date": "2026-07-22",
-    "scope": "admin-only algorithm diagnostics backend at /admin",
+    "scope": "isolated Supabase-backed administrator system at /admin",
     "macrostructure": "Workbench",
     "theme": "Hum",
-    "components": ["admin-only navigation", "diagnostic controls", "summary strip", "trace records"],
+    "components": ["standalone admin shell", "private admin login", "diagnostic controls", "summary strip", "trace records"],
     "enrichment": "none",
     "motion": [],
     "critique": {"philosophy": 5, "hierarchy": 5, "execution": 5, "specificity": 5, "restraint": 5, "variety": 5},
-    "slop_test": "pass 58/58 for the merchant algorithm backend surface",
+    "slop_test": "pass 58/58 for the standalone administrator surface",
     "responsive": "pass at 320, 375, 414, 768, and 1280 CSS pixels; no horizontal overflow",
-    "notes": "Removed all merchant access and links. The dedicated /admin entry requires the admin role and runs isolated feed or search probes without logging impressions or spending the active engine budget."
+    "notes": "Administrator identities and sessions are isolated from commerce users in Supabase-backed admin_users/admin_sessions tables and a dedicated cookie. The /admin shell has its own login and layout, with no storefront or merchant navigation dependency."
   },
   {
     "date": "2026-07-22",

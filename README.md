@@ -23,6 +23,8 @@ export STRIPE_SECRET_KEY=sk_test_...
 export STRIPE_WEBHOOK_SECRET=whsec_...
 export SOUTUI_BOOTSTRAP_MERCHANT_EMAIL=merchant@example.com
 export SOUTUI_BOOTSTRAP_MERCHANT_PASSWORD='请使用强密码'
+export SOUTUI_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+export SOUTUI_BOOTSTRAP_ADMIN_PASSWORD='请使用独立强密码'
 export SOUTUI_SECURE_COOKIE=1  # HTTPS 生产环境
 export SOUTUI_BASE_PATH=/shop  # 仅在子路径部署时设置
 PYTHONPATH=src uvicorn soutui.api:app --host 0.0.0.0 --port 8088
@@ -43,10 +45,13 @@ Stripe Webhook 地址为 `https://你的域名/webhooks/stripe`，订阅
 | `/order/{id}` | 订单结果 |
 | `/login` `/register` | 登录 / 注册 |
 | `/merchant` | 商家商品、库存、订单、模型管理 |
+| `/admin/login` `/admin` | 独立管理员登录 / 算法诊断后台 |
 | `/api/search` `/api/feed` | JSON 接口（兼容） |
-| `/trace/stream` | 算法步骤 SSE |
+| `/admin/trace/stream` | 管理员专属算法步骤 SSE |
 
-本地开发默认使用 `data/soutui.db`；设置 `DATABASE_URL` 后自动切换到 Supabase/PostgreSQL。目录、库存、购物车、订单、会话、events 和训练模型都会进入 PostgreSQL。
+管理员与商城账号完全隔离：商城及商家使用 `users/sessions`，管理员使用 `admin_users/admin_sessions` 与独立 Cookie，二者不能互相登录。
+
+本地开发默认使用 `data/soutui.db`；设置 `DATABASE_URL` 后自动切换到 Supabase/PostgreSQL。目录、库存、购物车、订单、两套身份会话、events 和训练模型都会进入 PostgreSQL。
 
 ## Cloud Run + Supabase
 
